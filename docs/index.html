@@ -3933,7 +3933,7 @@ h1::after {
     </div><!-- /room-tab-booking -->
 
     <!-- 頁籤：酒店設定 -->
-    <div class="room-tab-content" id="room-tab-config" style="display:none!important;">
+    <div class="room-tab-content" id="room-tab-config">
       <div class="hc-panel">
         <div class="hc-filter-bar">
           <select id="hc-filter-casino" onchange="hcFilter()">
@@ -4814,8 +4814,6 @@ document.addEventListener("keydown", function(e) {
   if (e.ctrlKey && e.key === "n") { e.preventDefault(); if (!isModalOpen()) openModal(); return; }
   // Ctrl+S 儲存
   if (e.ctrlKey && e.key === "s") { e.preventDefault(); saveData(true); showToast("已儲存 " + txs.length + " 筆","success"); return; }
-  // Ctrl+Z 復原
-  if (e.ctrlKey && e.key === "z") { e.preventDefault(); undoDelete(); return; }
   // Ctrl+1~5 切換頁面
   if (e.ctrlKey && e.key >= "1" && e.key <= "5") {
     e.preventDefault();
@@ -4848,22 +4846,18 @@ function isModalOpen() {
     document.getElementById("agent-mgr-modal").classList.contains("show");
 }
 
-// ===== 刪除撤銷 =====
-var lastDeleted = null;
+// ===== 刪除交易 =====
 // v12.0.6 B方案：使用 _fbKey 精準刪除（修復舊資料相容）
 function deleteTx(fbKey) {
   try {
   if (!confirm("確定刪除此筆交易？")) return;
   showLoading("刪除中…");
-  // 保存副本供撤銷
   var found = false;
   var targetFbKey = fbKey;
   for (var i = 0; i < txs.length; i++) {
     var t = txs[i];
     if (!t) continue;
     if (t._fbKey === fbKey || String(t.id) === String(fbKey) || t.id === parseInt(fbKey) || String(t._fbKey) === String(fbKey)) {
-      lastDeleted = t;
-      lastDeleted.fbKey = t._fbKey || fbKey;
       targetFbKey = t._fbKey || fbKey;
       found = true;
       break;
@@ -4892,42 +4886,15 @@ function deleteTx(fbKey) {
   renderOverview();
   renderSummary();
   updateTotalWalletUI();
-  if (lastDeleted) showUndoToast();
+  showToast("已刪除 1 筆交易", "success");
+  setTimeout(function(){ showToast("同步中…", "info"); }, 350);
+  setTimeout(function(){ showToast("同步成功", "success"); }, 950);
   setTimeout(hideLoading, 300);
   } catch(e) {
     hideLoading();
     console.error('[deleteTx] 錯誤:', e);
     showToast("刪除失敗：" + (e.message||e), "error");
   }
-}
-function showUndoToast() {
-  var container = document.getElementById("toast-container");
-  var el = document.createElement("div");
-  el.className = "toast toast-warning";
-  el.style.cssText = "cursor:pointer;flex-direction:column;gap:6px;";
-  el.innerHTML = "<span>已刪除 1 筆交易</span><button style='padding:4px 12px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);border-radius:6px;color:#fff;cursor:pointer;font-size:12px;'>↩ 撤銷</button>";
-  el.querySelector("button").onclick = function(e) {
-    e.stopPropagation();
-    undoDelete();
-    el.remove();
-  };
-  el.onclick = function() { el.remove(); };
-  container.appendChild(el);
-  setTimeout(function() { if (el.parentNode) el.remove(); }, 5000);
-}
-// v12.0.6 B方案：撤銷時寫入 Firebase
-function undoDelete() {
-  if (!lastDeleted) return;
-  txs.push(lastDeleted);
-  // v12.0.6 重試封裝寫入 Firebase
-  if (db && lastDeleted.fbKey) _syncSet(db.ref('macau_data/txs/' + lastDeleted.fbKey), lastDeleted);
-  saveData(true);
-  renderAll();
-  renderOverview();
-  renderSummary();
-  updateTotalWalletUI();
-  showToast("已恢復交易！","success");
-  lastDeleted = null;
 }
 
 // ===== 月度管理 =====
@@ -5517,6 +5484,8 @@ function saveFundForm() {
   doQuery();
   updateTotalWalletUI();
   showToast("已儲存！","success");
+  setTimeout(function(){ showToast("同步中…", "info"); }, 350);
+  setTimeout(function(){ showToast("同步成功", "success"); }, 950);
   window._savingFund = false;
 }
 // v12.0.6 B方案：使用 _fbKey 刪除公基金
@@ -5540,6 +5509,9 @@ function deleteFund(id) {
   saveFundData(true);
   doQuery();
   updateTotalWalletUI();
+  showToast("已刪除！","success");
+  setTimeout(function(){ showToast("同步中…", "info"); }, 350);
+  setTimeout(function(){ showToast("同步成功", "success"); }, 950);
   } catch(e) {
     console.error('[deleteFund] 錯誤:', e);
     showToast("刪除失敗：" + (e.message||e), "error");
@@ -5619,6 +5591,8 @@ function saveAgentWalletForm() {
     closeAgentWalletModal();
     try { doQuery(); } catch(e2) { console.error("[saveAgentWalletForm] doQuery error:", e2); }
     showToast("已儲存！","success");
+    setTimeout(function(){ showToast("同步中…", "info"); }, 350);
+    setTimeout(function(){ showToast("同步成功", "success"); }, 950);
   } catch(e) {
     console.error("[saveAgentWalletForm] error:", e);
     showToast("儲存失敗：" + (e.message||e), "error");
@@ -5681,7 +5655,9 @@ function deleteAgentWallet(agent, id) {
 
   syncAgentDrawn(agent);
   try { doQuery(); } catch(e) { console.error('[deleteAgentWallet] doQuery 錯誤:', e); }
-  showToast("代理錢包已刪除，同步中…", "success");
+  showToast("代理錢包已刪除","success");
+  setTimeout(function(){ showToast("同步中…", "info"); }, 350);
+  setTimeout(function(){ showToast("同步成功", "success"); }, 950);
   console.log("[deleteAgentWallet] === 完成 ===");
 }
 function syncAgentDrawn(agent) {
@@ -7762,11 +7738,15 @@ var RM = {
       _k = (idx>=0 && this.bookings[idx] && this.bookings[idx]._fbKey) ? this.bookings[idx]._fbKey : _fbKey();
       if (idx>=0) this.bookings[idx] = { id:this.bookings[idx].id, _fbKey:_k, date:date, agent:agent, client:client, casino:casino, hotel:hotel, roomType:roomType, checkIn:checkIn, checkOut:checkout, nights:nights, pricePerNight:price, totalCost:total, status:status, threshold:threshold, month:date.substring(0,7), note:note };
       showToast("訂房已更新","success");
+      setTimeout(function(){ showToast("同步中…", "info"); }, 350);
+      setTimeout(function(){ showToast("同步成功", "success"); }, 950);
     } else {
       this.lastId++;
       _k = _fbKey();
       this.bookings.push({ id:this.lastId, _fbKey:_k, date:date, agent:agent, client:client, casino:casino, hotel:hotel, roomType:roomType, checkIn:checkIn, checkOut:checkout, nights:nights, pricePerNight:price, totalCost:total, status:status, threshold:threshold, month:date.substring(0,7), note:note });
       showToast("訂房已新增","success");
+      setTimeout(function(){ showToast("同步中…", "info"); }, 350);
+      setTimeout(function(){ showToast("同步成功", "success"); }, 950);
     }
     this.save();
     // v12.0.6 使用重試封裝直接寫入 Firebase 同步（確保即時同步）
@@ -7800,6 +7780,8 @@ var RM = {
     this.render();
     this.updateQuota();
     showToast("訂房已刪除","success");
+    setTimeout(function(){ showToast("同步中…", "info"); }, 350);
+    setTimeout(function(){ showToast("同步成功", "success"); }, 950);
   },
 
   render: function() {
@@ -8545,94 +8527,6 @@ function animateKPIValue(el, targetValue) {
     else el.textContent = targetValue.toLocaleString();
   }
   requestAnimationFrame(step);
-}
-
-// ── 多级撤销系统 ──
-var _undoStack = [];
-var _MAX_UNDO = 10;
-
-// 重写 deleteTx 以支持多级撤销
-(function() {
-  var _origDeleteTx = deleteTx;
-  deleteTx = function(id) {
-    console.log('[deleteTx] 函數被調用，ID:', id);
-    if (!confirm("確定刪除此筆交易？")) { console.log('[deleteTx] 使用者取消刪除'); return; }
-    showLoading("刪除中…");
-    try {
-      console.log('[deleteTx] 開始刪除，交易數量（刪除前）:', txs.length);
-      var key = String(id);
-      var deleted = null, delIndex = -1, targetFbKey = null;
-      for (var i = 0; i < txs.length; i++) {
-        var t = txs[i];
-        if (!t) continue;
-        if (t._fbKey === key || String(t.id) === key || t.id === parseInt(id)) {
-          deleted = t; delIndex = i; targetFbKey = t._fbKey || key; break;
-        }
-      }
-      if (deleted) {
-        _undoStack.push({ tx: JSON.parse(JSON.stringify(deleted)), index: delIndex });
-        if (_undoStack.length > _MAX_UNDO) _undoStack.shift();
-      }
-      // v12.0.6 直接從 Firebase 刪除該筆記錄
-      if (db && targetFbKey && targetFbKey !== "undefined") {
-        db.ref('macau_data/txs/' + targetFbKey).set(null, function(error) {
-          if (error) console.error('[deleteTx] Firebase 刪除失敗:', error);
-        });
-      }
-      var newTxs = [];
-      for (var i = 0; i < txs.length; i++) {
-        var t = txs[i];
-        if (!t) continue;
-        var isMatch = (t._fbKey === targetFbKey) || (String(t.id) === String(targetFbKey)) || (t.id === parseInt(targetFbKey));
-        if (!isMatch) newTxs.push(t);
-      }
-      txs = newTxs;
-      saveData(true);
-      renderAll();
-      renderOverview();
-      renderSummary();
-      updateTotalWalletUI();
-      if (deleted) showUndoToast();
-    } catch(e) {
-      console.error("[deleteTx] error:", e);
-      showToast("删除失败：" + e.message, "error");
-    } finally {
-      setTimeout(hideLoading, 300);
-    }
-  };
-
-  // 增强撤销Toast
-  var _origShowUndoToast = showUndoToast;
-  showUndoToast = function() {
-    var container = document.getElementById("toast-container");
-    var el = document.createElement("div");
-    el.className = "toast toast-warning";
-    el.style.cssText = "cursor:pointer;flex-direction:column;gap:6px;";
-    el.innerHTML = "<span>已删除 1 笔交易（" + _undoStack.length + " 笔可撤销历史）</span>" +
-      "<button style='padding:4px 12px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);border-radius:6px;color:#fff;cursor:pointer;font-size:12px;margin-right:4px;'>↩ 撤销</button>" +
-      "<button style='padding:4px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#ccc;cursor:pointer;font-size:12px;' onclick='event.stopPropagation();_undoStack=[];this.parentElement.remove();'>清空历史</button>";
-    el.querySelector("button").onclick = function(e) {
-      e.stopPropagation();
-      undoLastDelete();
-      el.remove();
-    };
-    el.onclick = function() { el.remove(); };
-    container.appendChild(el);
-    setTimeout(function() { if (el.parentNode) el.remove(); }, 5000);
-  };
-})();
-
-// 撤销最近删除
-function undoLastDelete() {
-  if (_undoStack.length === 0) { showToast("无可撤销操作", "warning"); return; }
-  var item = _undoStack.pop();
-  txs.splice(item.index, 0, item.tx);
-  saveData(true);
-  renderAll();
-  renderOverview();
-  renderSummary();
-  updateTotalWalletUI();
-  showToast("已恢复交易！（剩余 " + _undoStack.length + " 笔可撤销）", "success");
 }
 
 // ── 键盘快捷键帮助面板 ──
