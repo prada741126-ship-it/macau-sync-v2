@@ -3424,9 +3424,11 @@ h1::after {
      全局优化
      ============================================================ */
   body {
-    overflow-x: hidden;
     -webkit-text-size-adjust: 100%;
   }
+
+  #room-tab-config { display: none !important; }
+  #room-tab-config.active { display: flex !important; flex-direction: column; flex: 1; min-height: 0; }
 
   /* 防止表格单元格溢出 */
   td, th {
@@ -3938,7 +3940,7 @@ h1::after {
     </div><!-- /room-tab-booking -->
 
     <!-- 頁籤：酒店設定 -->
-    <div class="room-tab-content" id="room-tab-config">
+    <div class="room-tab-content" id="room-tab-config" style="display:none!important;">
       <div class="hc-panel">
         <div class="hc-filter-bar">
           <select id="hc-filter-casino" onchange="hcFilter()">
@@ -4819,8 +4821,8 @@ document.addEventListener("keydown", function(e) {
   if (e.ctrlKey && e.key === "n") { e.preventDefault(); if (!isModalOpen()) openModal(); return; }
   // Ctrl+S 儲存
   if (e.ctrlKey && e.key === "s") { e.preventDefault(); saveData(true); showToast("已儲存 " + txs.length + " 筆","success"); return; }
-  // Ctrl+Z 復原
-  if (e.ctrlKey && e.key === "z") { e.preventDefault(); undoDelete(); return; }
+  // Ctrl+Z 撤銷刪除（已停用）
+  // if (e.ctrlKey && e.key === "z") { e.preventDefault(); undoDelete(); return; }
   // Ctrl+1~5 切換頁面
   if (e.ctrlKey && e.key >= "1" && e.key <= "5") {
     e.preventDefault();
