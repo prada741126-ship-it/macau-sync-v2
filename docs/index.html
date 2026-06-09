@@ -1527,6 +1527,10 @@ select {
   cursor: pointer;
   color-scheme: dark;
 }
+select option {
+  background: #161b22;
+  color: #e6edf3;
+}
 
 
 /* ============================================================
@@ -2134,6 +2138,7 @@ select {
   #page-room .room-table { font-size: 13px; }
   #page-room .room-table th { padding: 8px 10px; font-size: 11px; }
   #page-room .room-table td { padding: 9px 10px; }
+  #room-tab-config { display: none; }
   #room-tab-config.active { display: flex; flex-direction: column; flex: 1; min-height: 0; }
   .hc-panel { flex: 1; min-height: 0; }
   .hc-table-wrap { max-height: calc(100vh - 350px); }
@@ -4849,21 +4854,17 @@ function isModalOpen() {
 }
 
 // ===== 刪除撤銷 =====
-var lastDeleted = null;
 // v11.2.18 B方案：使用 _fbKey 精準刪除（修復舊資料相容）
 function deleteTx(fbKey) {
   try {
   if (!confirm("確定刪除此筆交易？")) return;
   showLoading("刪除中…");
-  // 保存副本供撤銷
   var found = false;
   var targetFbKey = fbKey;
   for (var i = 0; i < txs.length; i++) {
     var t = txs[i];
     if (!t) continue;
     if (t._fbKey === fbKey || String(t.id) === String(fbKey) || t.id === parseInt(fbKey) || String(t._fbKey) === String(fbKey)) {
-      lastDeleted = t;
-      lastDeleted.fbKey = t._fbKey || fbKey;
       targetFbKey = t._fbKey || fbKey;
       found = true;
       break;
@@ -4892,42 +4893,15 @@ function deleteTx(fbKey) {
   renderOverview();
   renderSummary();
   updateTotalWalletUI();
-  if (lastDeleted) showUndoToast();
+  showToast("已刪除 1 筆交易", "success");
+  setTimeout(function(){ showToast("同步中…", "info"); }, 350);
+  setTimeout(function(){ showToast("同步成功", "success"); }, 950);
   setTimeout(hideLoading, 300);
   } catch(e) {
     hideLoading();
     console.error('[deleteTx] 錯誤:', e);
     showToast("刪除失敗：" + (e.message||e), "error");
   }
-}
-function showUndoToast() {
-  var container = document.getElementById("toast-container");
-  var el = document.createElement("div");
-  el.className = "toast toast-warning";
-  el.style.cssText = "cursor:pointer;flex-direction:column;gap:6px;";
-  el.innerHTML = "<span>已刪除 1 筆交易</span><button style='padding:4px 12px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);border-radius:6px;color:#fff;cursor:pointer;font-size:12px;'>↩ 撤銷</button>";
-  el.querySelector("button").onclick = function(e) {
-    e.stopPropagation();
-    undoDelete();
-    el.remove();
-  };
-  el.onclick = function() { el.remove(); };
-  container.appendChild(el);
-  setTimeout(function() { if (el.parentNode) el.remove(); }, 5000);
-}
-// v11.2.18 B方案：撤銷時寫入 Firebase
-function undoDelete() {
-  if (!lastDeleted) return;
-  txs.push(lastDeleted);
-  // v11.2.18 重試封裝寫入 Firebase
-  if (db && lastDeleted.fbKey) _syncSet(db.ref('macau_data/txs/' + lastDeleted.fbKey), lastDeleted);
-  saveData(true);
-  renderAll();
-  renderOverview();
-  renderSummary();
-  updateTotalWalletUI();
-  showToast("已恢復交易！","success");
-  lastDeleted = null;
 }
 
 // ===== 月度管理 =====
@@ -5517,6 +5491,8 @@ function saveFundForm() {
   doQuery();
   updateTotalWalletUI();
   showToast("已儲存！","success");
+  setTimeout(function(){ showToast("同步中…", "info"); }, 350);
+  setTimeout(function(){ showToast("同步成功", "success"); }, 950);
   window._savingFund = false;
 }
 // v11.2.18 B方案：使用 _fbKey 刪除公基金
@@ -5540,6 +5516,9 @@ function deleteFund(id) {
   saveFundData(true);
   doQuery();
   updateTotalWalletUI();
+  showToast("已刪除！","success");
+  setTimeout(function(){ showToast("同步中…", "info"); }, 350);
+  setTimeout(function(){ showToast("同步成功", "success"); }, 950);
   } catch(e) {
     console.error('[deleteFund] 錯誤:', e);
     showToast("刪除失敗：" + (e.message||e), "error");
@@ -5619,6 +5598,8 @@ function saveAgentWalletForm() {
     closeAgentWalletModal();
     try { doQuery(); } catch(e2) { console.error("[saveAgentWalletForm] doQuery error:", e2); }
     showToast("已儲存！","success");
+    setTimeout(function(){ showToast("同步中…", "info"); }, 350);
+    setTimeout(function(){ showToast("同步成功", "success"); }, 950);
   } catch(e) {
     console.error("[saveAgentWalletForm] error:", e);
     showToast("儲存失敗：" + (e.message||e), "error");
@@ -5681,7 +5662,9 @@ function deleteAgentWallet(agent, id) {
 
   syncAgentDrawn(agent);
   try { doQuery(); } catch(e) { console.error('[deleteAgentWallet] doQuery 錯誤:', e); }
-  showToast("代理錢包已刪除，同步中…", "success");
+  showToast("代理錢包已刪除","success");
+  setTimeout(function(){ showToast("同步中…", "info"); }, 350);
+  setTimeout(function(){ showToast("同步成功", "success"); }, 950);
   console.log("[deleteAgentWallet] === 完成 ===");
 }
 function syncAgentDrawn(agent) {
@@ -7781,6 +7764,9 @@ var RM = {
     // 後台重新渲染（即使報錯也不影響彈窗關閉）
     try { this.render(); } catch(e) { console.error("RM.render error:", e); }
     try { this.updateQuota(); } catch(e) { console.error("RM.updateQuota error:", e); }
+    var editing = this.editingId ? true : false;
+    setTimeout(function(){ showToast("同步中…", "info"); }, 350);
+    setTimeout(function(){ showToast("同步成功", "success"); }, 950);
   },
   delete: function(id) {
     if (!confirm("確定要刪除這筆訂房紀錄嗎？")) return;
@@ -7800,6 +7786,8 @@ var RM = {
     this.render();
     this.updateQuota();
     showToast("訂房已刪除","success");
+    setTimeout(function(){ showToast("同步中…", "info"); }, 350);
+    setTimeout(function(){ showToast("同步成功", "success"); }, 950);
   },
 
   render: function() {
