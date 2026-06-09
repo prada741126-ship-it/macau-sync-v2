@@ -1716,6 +1716,7 @@ tbody tr:hover {
 <!-- Firebase SDK -->
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
   const firebaseConfig = {
     apiKey: "AIzaSyAoJ7hd3fU8o8G_5-e4zk_J6g0MjurzNtJw",
@@ -2443,71 +2444,6 @@ tbody tr:hover {
 <!-- Toast 通知容器 -->
 <div class="toast-container" id="toast-container"></div>
 
-<!-- v10.10 手機除錯面板 -->
-<button id="debug-toggle" onclick="DBG.toggle()" title="除錯面板">⌨</button>
-<div id="debug-panel"></div>
-<script>
-// ══════════════════════════════════════
-// v10.10 手機除錯系統：攔截 console.log/error/warn
-// ══════════════════════════════════════
-var DBG = (function(){
-  var MAX = 200;
-  var logs = [];
-  var panel = null;
-  var timer = null;
-
-  function render() {
-    if (!panel) panel = document.getElementById('debug-panel');
-    if (!panel) return;
-    var html = '<div id="debug-clear" onclick="DBG.clear()">— 清除紀錄 —</div>';
-    for (var i = 0; i < logs.length; i++) {
-      var c = logs[i].level === 'error' ? 'dbg-err' : logs[i].level === 'warn' ? 'dbg-warn' : 'dbg-info';
-      html += '<div class="dbg-line ' + c + '">' + escHtml(logs[i].msg) + '</div>';
-    }
-    panel.innerHTML = html;
-    panel.scrollTop = panel.scrollHeight;
-  }
-
-  function escHtml(s) {
-    if (!s) return '';
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
-  // 攔截並記錄
-  function hook(fn, level) {
-    return function() {
-      var args = Array.prototype.slice.call(arguments);
-      var msg = args.map(function(a){ try{ return typeof a==='object'? JSON.stringify(a) : String(a); }catch(e){ return String(a); } }).join(' ');
-      logs.push({ level: level, msg: msg, t: Date.now() });
-      if (logs.length > MAX) logs.shift();
-      render();
-      return fn.apply(console, arguments);
-    };
-  }
-
-  // 攔截 XMLHttpRequest/fetch 的 Firebase 呼叫（簡易版）
-  function init() {
-    panel = document.getElementById('debug-panel');
-    // 攔截 console
-    console.log   = hook(console.log.bind(console),   'info');
-    console.error  = hook(console.error.bind(console),  'error');
-    console.warn   = hook(console.warn.bind(console),   'warn');
-    console.info   = hook(console.info.bind(console),   'info');
-    render();
-  }
-
-  return {
-    toggle: function() {
-      if (!panel) panel = document.getElementById('debug-panel');
-      if (panel) panel.classList.toggle('show');
-      if (!DBG._inited) { DBG._inited = true; init(); }
-    },
-    clear: function() { logs = []; render(); },
-    _inited: false
-  };
-})();
-</script>
-
 <script>
 var txs = [];
 var fundWithdrawals = [];
@@ -2704,8 +2640,6 @@ document.addEventListener("keydown", function(e) {
   if (e.ctrlKey && e.key === "n") { e.preventDefault(); if (!isModalOpen()) openModal(); return; }
   // Ctrl+S 儲存
   if (e.ctrlKey && e.key === "s") { e.preventDefault(); saveData(true); showToast("已儲存 " + txs.length + " 筆","success"); return; }
-  // Ctrl+Z 復原
-  if (e.ctrlKey && e.key === "z") { e.preventDefault(); undoDelete(); return; }
   // Ctrl+1~5 切換頁面
   if (e.ctrlKey && e.key >= "1" && e.key <= "5") {
     e.preventDefault();
@@ -2739,22 +2673,17 @@ function isModalOpen() {
     document.getElementById("agent-mgr-modal").classList.contains("show");
 }
 
-// ===== 刪除撤銷 =====
-var lastDeleted = null;
 // v10.0 B方案：使用 _fbKey 精準刪除（修復舊資料相容）
 function deleteTx(fbKey) {
   try {
   if (!confirm("確定刪除此筆交易？")) return;
   showLoading("刪除中…");
-  // 保存副本供撤銷
   var found = false;
   var targetFbKey = fbKey;
   for (var i = 0; i < txs.length; i++) {
     var t = txs[i];
     if (!t) continue;
     if (t._fbKey === fbKey || String(t.id) === String(fbKey) || t.id === parseInt(fbKey) || String(t._fbKey) === String(fbKey)) {
-      lastDeleted = t;
-      lastDeleted.fbKey = t._fbKey || fbKey;
       targetFbKey = t._fbKey || fbKey;
       found = true;
       break;
@@ -2785,42 +2714,13 @@ function deleteTx(fbKey) {
   renderOverview();
   renderSummary();
   updateTotalWalletUI();
-  if (lastDeleted) showUndoToast();
+  showToast("已刪除", "success");
   setTimeout(hideLoading, 300);
   } catch(e) {
     hideLoading();
     console.error('[deleteTx] 錯誤:', e);
     showToast("刪除失敗：" + (e.message||e), "error");
   }
-}
-function showUndoToast() {
-  var container = document.getElementById("toast-container");
-  var el = document.createElement("div");
-  el.className = "toast toast-warning";
-  el.style.cssText = "cursor:pointer;flex-direction:column;gap:6px;";
-  el.innerHTML = "<span>已刪除 1 筆交易</span><button style='padding:4px 12px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);border-radius:6px;color:#fff;cursor:pointer;font-size:12px;'>↩ 撤銷</button>";
-  el.querySelector("button").onclick = function(e) {
-    e.stopPropagation();
-    undoDelete();
-    el.remove();
-  };
-  el.onclick = function() { el.remove(); };
-  container.appendChild(el);
-  setTimeout(function() { if (el.parentNode) el.remove(); }, 5000);
-}
-// v10.0 B方案：撤銷時寫入 Firebase
-function undoDelete() {
-  if (!lastDeleted) return;
-  txs.push(lastDeleted);
-  // 寫入 Firebase
-  if (db && lastDeleted.fbKey) db.ref('macau_data/txs/' + lastDeleted.fbKey).set(lastDeleted);
-  saveData(true);
-  renderAll();
-  renderOverview();
-  renderSummary();
-  updateTotalWalletUI();
-  showToast("已恢復交易！","success");
-  lastDeleted = null;
 }
 
 // ===== 月度管理 =====
@@ -3484,6 +3384,8 @@ function saveFundForm() {
   doQuery();
   updateTotalWalletUI();
   showToast("已儲存！","success");
+  showToast("同步中…", "info");
+  setTimeout(function(){ showToast("同步成功", "success"); }, 600);
   window._savingFund = false;
 }
 // v10.0 B方案：使用 _fbKey 刪除公基金
@@ -3509,6 +3411,9 @@ function deleteFund(id) {
   saveFundData(true);
   doQuery();
   updateTotalWalletUI();
+  showToast("已刪除", "success");
+  showToast("同步中…", "info");
+  setTimeout(function(){ showToast("同步成功", "success"); }, 600);
   } catch(e) {
     console.error('[deleteFund] 錯誤:', e);
     showToast("刪除失敗：" + (e.message||e), "error");
@@ -3583,6 +3488,8 @@ function saveAgentWalletForm() {
     closeAgentWalletModal();
     try { doQuery(); } catch(e2) { console.error("[saveAgentWalletForm] doQuery error:", e2); }
     showToast("已儲存！","success");
+    showToast("同步中…", "info");
+    setTimeout(function(){ showToast("同步成功", "success"); }, 600);
   } catch(e) {
     console.error("[saveAgentWalletForm] error:", e);
     showToast("儲存失敗：" + (e.message||e), "error");
@@ -3645,7 +3552,9 @@ function deleteAgentWallet(agent, id) {
 
   syncAgentDrawn(agent);
   try { doQuery(); } catch(e) { console.error('[deleteAgentWallet] doQuery 錯誤:', e); }
-  showToast("代理錢包已刪除，同步中…", "success");
+  showToast("代理錢包已刪除", "success");
+  showToast("同步中…", "info");
+  setTimeout(function(){ showToast("同步成功", "success"); }, 600);
   console.log("[deleteAgentWallet] === 完成 ===");
 }
 function syncAgentDrawn(agent) {
@@ -4569,7 +4478,7 @@ function doQuery() {
       if (txs[p].agent !== agent) continue;
       var bv = txs[p].bonus || 0;
       var cv = txs[p].cash || 0;
-      if (bv > 0) allLedger.push({ date: txs[p].date, venue: txs[p].venue||"", client: txs[p].client||"", volume: toNum(txs[p].volume)||0, bonus: bv, rowType: "rolling", type: "入帳", source: "tx", id: txs[p].id, _fbKey: txs[p]._fbKey });
+      if (bv > 0 || txs[p].volume > 0) allLedger.push({ date: txs[p].date, venue: txs[p].venue||"", client: txs[p].client||"", volume: toNum(txs[p].volume)||0, bonus: bv, rowType: "rolling", type: "入帳", source: "tx", id: txs[p].id, _fbKey: txs[p]._fbKey });
       if (cv > 0) allLedger.push({ date: txs[p].date, venue: "現金寄放", client: txs[p].note||"", volume: 0, bonus: cv, rowType: "cash", type: "入帳", source: "tx", id: txs[p].id, _fbKey: txs[p]._fbKey });
     }
     for (var p = 0; p < awArr.length; p++) {
@@ -5663,6 +5572,8 @@ var RM = {
       showToast("訂房已新增","success");
     }
     this.save();
+    showToast("同步中…", "info");
+    setTimeout(function(){ showToast("同步成功", "success"); }, 600);
     this.closeModal();  // 先關閉彈窗，確保一定執行
     this.editingId = null;
     // 後台重新渲染（即使報錯也不影響彈窗關閉）
@@ -5687,6 +5598,8 @@ var RM = {
     this.render();
     this.updateQuota();
     showToast("訂房已刪除","success");
+    showToast("同步中…", "info");
+    setTimeout(function(){ showToast("同步成功", "success"); }, 600);
   },
 
   render: function() {
@@ -6412,94 +6325,6 @@ function animateKPIValue(el, targetValue) {
   requestAnimationFrame(step);
 }
 
-// ── 多级撤销系统 ──
-var _undoStack = [];
-var _MAX_UNDO = 10;
-
-// 重写 deleteTx 以支持多级撤销
-(function() {
-  var _origDeleteTx = deleteTx;
-  deleteTx = function(id) {
-    console.log('[deleteTx] 函數被調用，ID:', id);
-    if (!confirm("確定刪除此筆交易？")) { console.log('[deleteTx] 使用者取消刪除'); return; }
-    showLoading("刪除中…");
-    try {
-      console.log('[deleteTx] 開始刪除，交易數量（刪除前）:', txs.length);
-      var key = String(id);
-      var deleted = null, delIndex = -1, targetFbKey = null;
-      for (var i = 0; i < txs.length; i++) {
-        var t = txs[i];
-        if (!t) continue;
-        if (t._fbKey === key || String(t.id) === key || t.id === parseInt(id)) {
-          deleted = t; delIndex = i; targetFbKey = t._fbKey || key; break;
-        }
-      }
-      if (deleted) {
-        _undoStack.push({ tx: JSON.parse(JSON.stringify(deleted)), index: delIndex });
-        if (_undoStack.length > _MAX_UNDO) _undoStack.shift();
-      }
-      // v10.0 直接從 Firebase 刪除該筆記錄
-      if (db && targetFbKey && targetFbKey !== "undefined") {
-        db.ref('macau_data/txs/' + targetFbKey).set(null, function(error) {
-          if (error) console.error('[deleteTx] Firebase 刪除失敗:', error);
-        });
-      }
-      var newTxs = [];
-      for (var i = 0; i < txs.length; i++) {
-        var t = txs[i];
-        if (!t) continue;
-        var isMatch = (t._fbKey === targetFbKey) || (String(t.id) === String(targetFbKey)) || (t.id === parseInt(targetFbKey));
-        if (!isMatch) newTxs.push(t);
-      }
-      txs = newTxs;
-      saveData(true);
-      renderAll();
-      renderOverview();
-      renderSummary();
-      updateTotalWalletUI();
-      if (deleted) showUndoToast();
-    } catch(e) {
-      console.error("[deleteTx] error:", e);
-      showToast("删除失败：" + e.message, "error");
-    } finally {
-      setTimeout(hideLoading, 300);
-    }
-  };
-
-  // 增强撤销Toast
-  var _origShowUndoToast = showUndoToast;
-  showUndoToast = function() {
-    var container = document.getElementById("toast-container");
-    var el = document.createElement("div");
-    el.className = "toast toast-warning";
-    el.style.cssText = "cursor:pointer;flex-direction:column;gap:6px;";
-    el.innerHTML = "<span>已删除 1 笔交易（" + _undoStack.length + " 笔可撤销历史）</span>" +
-      "<button style='padding:4px 12px;background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.3);border-radius:6px;color:#fff;cursor:pointer;font-size:12px;margin-right:4px;'>↩ 撤销</button>" +
-      "<button style='padding:4px 12px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.15);border-radius:6px;color:#ccc;cursor:pointer;font-size:12px;' onclick='event.stopPropagation();_undoStack=[];this.parentElement.remove();'>清空历史</button>";
-    el.querySelector("button").onclick = function(e) {
-      e.stopPropagation();
-      undoLastDelete();
-      el.remove();
-    };
-    el.onclick = function() { el.remove(); };
-    container.appendChild(el);
-    setTimeout(function() { if (el.parentNode) el.remove(); }, 5000);
-  };
-})();
-
-// 撤销最近删除
-function undoLastDelete() {
-  if (_undoStack.length === 0) { showToast("无可撤销操作", "warning"); return; }
-  var item = _undoStack.pop();
-  txs.splice(item.index, 0, item.tx);
-  saveData(true);
-  renderAll();
-  renderOverview();
-  renderSummary();
-  updateTotalWalletUI();
-  showToast("已恢复交易！（剩余 " + _undoStack.length + " 笔可撤销）", "success");
-}
-
 // ── 键盘快捷键帮助面板 ──
 function openShortcutHelp() {
   document.getElementById("shortcut-help-modal").classList.add("show");
@@ -6904,65 +6729,6 @@ input:focus, select:focus, textarea:focus {
 @media (max-width: 700px) {
   #back-to-top { bottom: 18px; right: 18px; width: 38px; height: 38px; font-size: 16px; }
 }
-/* ============================================================
-   手機除錯面板（v10.10）
-   ============================================================ */
-#debug-panel {
-  position: fixed;
-  bottom: 52px;
-  left: 8px;
-  width: calc(100vw - 80px);
-  max-height: 50vh;
-  background: rgba(0,0,0,0.92);
-  color: #0f0;
-  font-family: 'Courier New', monospace;
-  font-size: 11px;
-  line-height: 1.5;
-  padding: 8px;
-  border-radius: 8px;
-  border: 1px solid #0f0;
-  overflow-y: auto;
-  z-index: 99999;
-  display: none;
-  white-space: pre-wrap;
-  word-break: break-all;
-  box-shadow: 0 4px 24px rgba(0,0,0,0.7);
-}
-#debug-panel.show { display: block; }
-#debug-toggle {
-  position: fixed;
-  bottom: 10px;
-  left: 10px;
-  width: 38px;
-  height: 38px;
-  background: rgba(12,12,18,0.9);
-  color: #0f0;
-  border: 1px solid #0f0;
-  border-radius: 50%;
-  font-size: 18px;
-  z-index: 100000;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-#debug-panel .dbg-line { padding: 2px 0; border-bottom: 1px solid rgba(0,255,0,0.08); }
-#debug-panel .dbg-err { color: #f44; }
-#debug-panel .dbg-warn { color: #fa0; }
-#debug-panel .dbg-info { color: #4af; }
-#debug-clear {
-  position: sticky;
-  top: 0;
-  background: rgba(255,0,0,0.2);
-  color: #f88;
-  border: none;
-  width: 100%;
-  padding: 4px;
-  cursor: pointer;
-  font-size: 11px;
-  text-align: center;
-}
-
 /* ========== MOBILE BOTTOM NAVIGATION (v12.0.0) ========== */
 #mobile-nav {
   display: none;
