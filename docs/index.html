@@ -1,18 +1,18 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-<!-- BUILD: v11.2.18 (2026-06-10 #undefined) -->
+// BUILD: v12.0.5 (2026-06-10 mobile horizontal scroll + room tab fix)
 
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>澳門洗碼報表 v11.2.18</title>
+<title>澳門洗碼報表 v12.0.5</title>
 <!-- 版本快取清除：檢測到新版本時強制重新載入 -->
 <script>
 (function(){
-  var APP_VERSION = 'v11.2.18';
+  var APP_VERSION = 'v12.0.5';
   window.APP_VERSION = APP_VERSION;
   var stored = localStorage.getItem('macau_app_version');
   if (stored && stored !== APP_VERSION) {
@@ -1556,7 +1556,7 @@ select option {
   inset: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  touch-action: pan-y;
+  touch-action: pan-x pan-y;
   padding: 20px 10px 60px 10px;
 }
 
@@ -2086,6 +2086,8 @@ select option {
   color: var(--text-muted);
   font-size: 13px;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
   transition: all var(--trans-base);
   text-align: center;
 }
@@ -2775,7 +2777,7 @@ h1::after {
 
   #page-scroll {
     padding: 10px 8px;
-    overflow-x: hidden;
+    overflow-x: auto;
   }
 
   .page { padding: 6px 4px; }
@@ -3661,7 +3663,7 @@ h1::after {
     <span class="sb-label">折疊選單</span>
   </div>
   <!-- v11.2.18 版本號顯示 -->
-  <div class="sb-version" id="sb-version">v11.2.18</div>
+  <div class="sb-version" id="sb-version">v12.0.5</div>
 </div>
 
 <!-- 手機版側邊欄遮罩層 -->
@@ -3868,8 +3870,8 @@ h1::after {
   <div class="page" id="page-room">
     <!-- 房務頁籤切換 -->
     <div class="room-tabs">
-      <button class="room-tab active" onclick="switchRoomTab('booking',this)">📋 訂房管理</button>
-      <button class="room-tab" onclick="switchRoomTab('config',this)">⚙ 酒店設定</button>
+      <button type="button" class="room-tab active" onclick="switchRoomTab('booking',this)">📋 訂房管理</button>
+      <button type="button" class="room-tab" onclick="switchRoomTab('config',this)">⚙ 酒店設定</button>
     </div>
 
     <!-- 頁籤：訂房管理 -->
@@ -8763,6 +8765,6 @@ function filterTxsByTime(txs) {
 
 
   <div id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="回到頂部">▲</div>
-<div id="version-badge" style="position:fixed;bottom:4px;left:8px;font-size:10px;color:rgba(255,255,255,0.18);z-index:1;pointer-events:none;">v11.2.18</div>
+<div id="version-badge" style="position:fixed;bottom:4px;left:8px;font-size:10px;color:rgba(255,255,255,0.18);z-index:1;pointer-events:none;">v12.0.5</div>
 </body>
 </html>
