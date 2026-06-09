@@ -1,7 +1,20 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-TW">
 <head>
 <!-- v10.20 激進快取清除：最開頭就強制解除所有 SW + 清除所有 Cache -->
+<script>
+
+// Mobile Bottom Navigation (v12.0.0)
+function setMobileNav(page) {
+  var items = document.querySelectorAll('#mobile-nav .mn-item');
+  for (var i = 0; i < items.length; i++) {
+    items[i].classList.remove('active');
+    if (items[i].getAttribute('data-page') === page) {
+      items[i].classList.add('active');
+    }
+  }
+}
+</script>
 <script>
 (function(){
   // 1. 強制解除所有已註冊的 Service Worker
@@ -26,7 +39,7 @@
     });
   }
   // 3. 版本變數（給登入頁版本顯示用）
-  window.APP_VERSION = 'v10.21';
+  window.APP_VERSION = 'v12.0.0';
 })();
 </script>
 <meta charset="UTF-8">
@@ -34,7 +47,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
-<title>澳門洗碼報表 v10.20</title>
+<title>澳門洗碼報表 v12.0.0</title>
 <style>
 :root {
   --gold: #D4AF37;
@@ -1705,20 +1718,20 @@ tbody tr:hover {
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script>
   const firebaseConfig = {
-    apiKey: "AIzaSyDPLDEr5QnMQ_AD-z7Wppt2fylxWoBuxj0U",
-    authDomain: "macau-sync.firebaseapp.com",
-    databaseURL: "https://macau-sync-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "macau-sync",
-    storageBucket: "macau-sync.appspot.com",
-    messagingSenderId: "5394959664910",
-    appId: "1:5394959664910:web:f445ede79937711fdd65f",
-    measurementId: "G-8BFD758YCF"
+    apiKey: "AIzaSyAoJ7hd3fU8o8G_5-e4zk_J6g0MjurzNtJw",
+    authDomain: "macau-report.firebaseapp.com",
+    databaseURL: "https://macau-report-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "macau-report",
+    storageBucket: "macau-report.firebasestorage.app",
+    messagingSenderId: "141354139224",
+    appId: "1:141354139224:web:fe7b1d3d6a1e6c608d6a31",
+    measurementId: "G-8PV18SMBJ"
   };
   firebase.initializeApp(firebaseConfig);
   var db = firebase.database();
   console.log('[Firebase] 初始化完成');
 </script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>`n</head>
+</head>
 <body>
 
 <!-- 全域載入動畫 -->
@@ -6949,9 +6962,79 @@ input:focus, select:focus, textarea:focus {
   font-size: 11px;
   text-align: center;
 }
+
+/* ========== MOBILE BOTTOM NAVIGATION (v12.0.0) ========== */
+#mobile-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 56px;
+  background: linear-gradient(180deg, rgba(20,10,6,0.98), rgba(14,6,2,0.99));
+  border-top: 1px solid rgba(212,175,55,0.2);
+  z-index: 1000;
+  justify-content: space-around;
+  align-items: center;
+  padding: 0 4px;
+  backdrop-filter: blur(10px);
+}
+#mobile-nav .mn-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  padding: 6px 8px;
+  color: #8a7a60;
+  font-size: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex: 1;
+  border-radius: 8px;
+  max-width: 72px;
+}
+#mobile-nav .mn-item .mn-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+#mobile-nav .mn-item.active {
+  color: #D4AF37;
+  background: rgba(212,175,55,0.1);
+}
+@media (max-width: 700px) {
+  #mobile-nav { display: flex; }
+  #sidebar { display: none !important; }
+  #main-content { margin-bottom: 56px; }
+  body { flex-direction: column; }
+  #topbar { padding: 0 12px; }
+}
 </style>
 
   <div id="back-to-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" title="回到頂部">▲</div>
+
+<!-- Mobile Bottom Navigation (v12.0.0) -->
+<nav id="mobile-nav">
+  <div class="mn-item active" data-page="overview" onclick="showPage('overview');setMobileNav('overview')">
+    <span class="mn-icon">📊</span>
+    <span>總覽</span>
+  </div>
+  <div class="mn-item" data-page="all" onclick="showPage('all');setMobileNav('all')">
+    <span class="mn-icon">📋</span>
+    <span>交易</span>
+  </div>
+  <div class="mn-item" data-page="query" onclick="showPage('query');setMobileNav('query')">
+    <span class="mn-icon">🔍</span>
+    <span>查詢</span>
+  </div>
+  <div class="mn-item" data-page="summary" onclick="showPage('summary');setMobileNav('summary')">
+    <span class="mn-icon">📈</span>
+    <span>統計</span>
+  </div>
+  <div class="mn-item" data-page="room" onclick="showPage('room');setMobileNav('room')">
+    <span class="mn-icon">🏨</span>
+    <span>房務</span>
+  </div>
+</nav>
 </body>
 </html>
-

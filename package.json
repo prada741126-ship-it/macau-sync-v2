@@ -1,7 +1,7 @@
 {
   "name": "macau-sync-v2",
-  "version": "1.0.0",
-  "description": "澳门洗码报表 v10.21 正式版 — 全新部署",
+  "version": "12.0.0",
+  "description": "澳门洗码报表 v12.0.0 — 完整功能版（基于正式版V1.0）",
   "main": "server.js",
   "scripts": {
     "start": "node build.js && node server.js",
