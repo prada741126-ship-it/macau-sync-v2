@@ -7549,14 +7549,16 @@ function rmImportCSV()       { RM.importCSV(); }
 
 // src/pages/wallet.js
 /**
- * v13 总钱包页面
+ * v13 总钱包页面 (v2 重构)
  * 
  * 依赖: State, Events, calc/finance.js, utils/format.js
  * 
  * 页面内容:
  * 1. KPI 总览卡片 (总钱包余额、公基金余额、代理钱包总额、总存入、总提领)
- * 2. 公基金流水明细表
- * 3. 代理钱包明细 (每代理一卡片，含汇总 + 流水)
+ * 2. 时间筛选器 (独立月份)
+ * 3. 总钱包流水 (合并: 公基金记录 + 代理钱包记录 + 交易佣金产生的码粮/公基金)
+ * 4. 公基金卡片 (卡片式, 含汇总 + 流水明细)
+ * 5. 代理钱包卡片 (同原设计)
  */
 
 /**
@@ -7564,12 +7566,64 @@ function rmImportCSV()       { RM.importCSV(); }
  */
 function renderWallet() {
   try {
+    _populateMonthFilter();
     _renderWalletKPIs();
-    _renderFundTable();
+    _renderFlowTable();
+    _renderFundCard();
     _renderAgentWalletCards();
   } catch (e) {
     console.error('[v13:wallet] renderWallet error:', e);
   }
+}
+
+// ============================================================================
+// 月份筛选器
+// ============================================================================
+
+function _getWalletFilterMonth() {
+  var sel = document.getElementById('wallet-month-filter');
+  return (sel && sel.value) ? sel.value : '';
+}
+
+function _populateMonthFilter() {
+  var sel = document.getElementById('wallet-month-filter');
+  if (!sel) return;
+
+  var txs = State.get('txs');
+  var funds = State.get('fundWithdrawals');
+  var wallets = State.get('agentWallets');
+
+  // 收集所有月份
+  var months = {};
+  for (var i = 0; i < txs.length; i++) {
+    var m = (txs[i].date || '').replace(/\//g, '-').substring(0, 7);
+    if (m) months[m] = true;
+  }
+  for (var j = 0; j < funds.length; j++) {
+    var m2 = (funds[j].date || '').replace(/\//g, '-').substring(0, 7);
+    if (m2) months[m2] = true;
+  }
+  for (var ag in wallets) {
+    var recs = wallets[ag];
+    for (var k = 0; k < recs.length; k++) {
+      var m3 = (recs[k].date || '').replace(/\//g, '-').substring(0, 7);
+      if (m3) months[m3] = true;
+    }
+  }
+
+  var list = Object.keys(months).sort().reverse();
+
+  // 保持当前选中值
+  var currentVal = sel.value;
+
+  var html = '<option value="">全部時間</option>';
+  for (var n = 0; n < list.length; n++) {
+    var selAttr = (list[n] === currentVal) ? ' selected' : '';
+    html += '<option value="' + list[n] + '"' + selAttr + '>' + list[n] + '</option>';
+  }
+  sel.innerHTML = html;
+  // 恢复选中
+  if (currentVal) sel.value = currentVal;
 }
 
 // ============================================================================
@@ -7583,56 +7637,93 @@ function _renderWalletKPIs() {
   var txs = State.get('txs');
   var fundRecords = State.get('fundWithdrawals');
   var agentWallets = State.get('agentWallets');
+  var filterMonth = _getWalletFilterMonth();
 
-  // 公基金余额
+  // 筛选交易
+  var filteredTxs = txs;
+  var filteredFunds = fundRecords;
+  var filteredAWs = {};
+  if (filterMonth) {
+    filteredTxs = [];
+    for (var i = 0; i < txs.length; i++) {
+      if ((txs[i].date || '').replace(/\//g, '-').indexOf(filterMonth) === 0) {
+        filteredTxs.push(txs[i]);
+      }
+    }
+    filteredFunds = [];
+    for (var j = 0; j < fundRecords.length; j++) {
+      if ((fundRecords[j].date || '').replace(/\//g, '-').indexOf(filterMonth) === 0) {
+        filteredFunds.push(fundRecords[j]);
+      }
+    }
+    for (var ag in agentWallets) {
+      var recs = agentWallets[ag];
+      var filt = [];
+      for (var k = 0; k < recs.length; k++) {
+        if ((recs[k].date || '').replace(/\//g, '-').indexOf(filterMonth) === 0) {
+          filt.push(recs[k]);
+        }
+      }
+      if (filt.length > 0) filteredAWs[ag] = filt;
+    }
+  } else {
+    filteredAWs = agentWallets;
+  }
+
+  // 公基金余额 (全量、不受筛选影响 — KPI 应该是全量)
   var fundBalance = calcFundBalance(txs, fundRecords);
 
-  // 代理钱包总额
+  // 代理钱包总额 (全量)
+  var agents = {};
+  for (var a1 = 0; a1 < txs.length; a1++) {
+    var a = txs[a1].agent;
+    if (a) agents[a] = true;
+  }
+  for (var ag2 in agentWallets) {
+    agents[ag2] = true;
+  }
   var agentTotal = 0;
-  var allAgents = {};
-  for (var i = 0; i < txs.length; i++) {
-    var a = txs[i].agent;
-    if (a) allAgents[a] = true;
-  }
-  for (var ag in agentWallets) {
-    allAgents[ag] = true;
-  }
-  for (var name in allAgents) {
+  for (var name in agents) {
     agentTotal += calcAgentBalance(name, txs, agentWallets);
   }
 
-  // 总钱包余额 (使用统一入口，与 topbar / query 页保持一致)
+  // 总钱包余额
   var totalWallet = getTotalWallet();
 
-  // 总存入 (公基金存入 + 代理钱包存入 + 自存现金)
+  // 总存入 (筛选范围内)
   var totalDeposit = 0;
-  for (var j = 0; j < fundRecords.length; j++) {
-    var fr = fundRecords[j];
+  for (var d1 = 0; d1 < filteredFunds.length; d1++) {
+    var fr = filteredFunds[d1];
     if (fr.type === 'deposit' || fr.type === 'cash_deposit') {
       totalDeposit += toNum(fr.amount);
     }
   }
-  for (var ag2 in agentWallets) {
-    var recs = agentWallets[ag2];
-    for (var k = 0; k < recs.length; k++) {
-      if (recs[k].type === 'deposit' || recs[k].type === 'cash_deposit') {
-        totalDeposit += toNum(recs[k].amount);
+  for (var ag3 in filteredAWs) {
+    var recs3 = filteredAWs[ag3];
+    for (var d2 = 0; d2 < recs3.length; d2++) {
+      if (recs3[d2].type === 'deposit' || recs3[d2].type === 'cash_deposit') {
+        totalDeposit += toNum(recs3[d2].amount);
       }
     }
   }
+  // 存入也包括: 交易产生的佣金公基金 + 码粮 (视为流入)
+  for (var d3 = 0; d3 < filteredTxs.length; d3++) {
+    totalDeposit += toNum(filteredTxs[d3].fund);
+    totalDeposit += toNum(filteredTxs[d3].bonus);
+  }
 
-  // 总提领 (公基金提领 + 代理钱包提领)
+  // 总提领 (筛选范围内)
   var totalWithdraw = 0;
-  for (var m = 0; m < fundRecords.length; m++) {
-    if (fundRecords[m].type === 'withdraw') {
-      totalWithdraw += toNum(fundRecords[m].amount);
+  for (var w1 = 0; w1 < filteredFunds.length; w1++) {
+    if (filteredFunds[w1].type === 'withdraw') {
+      totalWithdraw += toNum(filteredFunds[w1].amount);
     }
   }
-  for (var ag3 in agentWallets) {
-    var recs2 = agentWallets[ag3];
-    for (var n = 0; n < recs2.length; n++) {
-      if (recs2[n].type === 'withdraw') {
-        totalWithdraw += toNum(recs2[n].amount);
+  for (var ag4 in filteredAWs) {
+    var recs4 = filteredAWs[ag4];
+    for (var w2 = 0; w2 < recs4.length; w2++) {
+      if (recs4[w2].type === 'withdraw') {
+        totalWithdraw += toNum(recs4[w2].amount);
       }
     }
   }
@@ -7656,17 +7747,93 @@ function _renderWalletKPIs() {
 }
 
 // ============================================================================
-// 公基金流水表
+// 总钱包流水 (合并所有金流来源)
 // ============================================================================
 
-function _renderFundTable() {
-  var tbody = document.querySelector('#wallet-fund-table tbody');
-  var empty = document.getElementById('wallet-fund-empty');
+function _renderFlowTable() {
+  var tbody = document.querySelector('#wallet-flow-table tbody');
+  var empty = document.getElementById('wallet-flow-empty');
   if (!tbody) return;
 
-  var records = State.get('fundWithdrawals');
+  var txs = State.get('txs');
+  var fundRecords = State.get('fundWithdrawals');
+  var agentWallets = State.get('agentWallets');
+  var filterMonth = _getWalletFilterMonth();
 
-  if (!records || records.length === 0) {
+  // 构建统一流水条目
+  var flows = [];
+
+  // 1) 公基金记录
+  for (var i = 0; i < fundRecords.length; i++) {
+    var fr = fundRecords[i];
+    var fm = (fr.date || '').replace(/\//g, '-').substring(0, 7);
+    if (filterMonth && fm !== filterMonth) continue;
+    var typeLabel = (fr.type === 'deposit' || fr.type === 'cash_deposit') ? '存入' : '提領';
+    if (fr.type === 'cash_deposit') typeLabel = '現金存入';
+    flows.push({
+      date: fr.date || '',
+      source: '公基金',
+      type: typeLabel,
+      amount: toNum(fr.amount),
+      sign: (fr.type === 'withdraw') ? -1 : 1,
+      note: fr.note || '',
+    });
+  }
+
+  // 2) 交易佣金产生的码粮和公基金
+  for (var j = 0; j < txs.length; j++) {
+    var tx = txs[j];
+    var tm = (tx.date || '').replace(/\//g, '-').substring(0, 7);
+    if (filterMonth && tm !== filterMonth) continue;
+    var fundVal = toNum(tx.fund);
+    var bonusVal = toNum(tx.bonus);
+    var volNote = '洗碼' + fmt(tx.volume) + '萬';
+
+    if (fundVal > 0) {
+      flows.push({
+        date: tx.date || '',
+        source: '公基金',
+        type: '佣金公基金',
+        amount: fundVal,
+        sign: 1,
+        note: (tx.agent || '') + ' ' + volNote,
+      });
+    }
+    if (bonusVal > 0) {
+      flows.push({
+        date: tx.date || '',
+        source: tx.agent || '',
+        type: '碼糧',
+        amount: bonusVal,
+        sign: 1,
+        note: volNote,
+      });
+    }
+  }
+
+  // 3) 代理钱包记录
+  for (var ag in agentWallets) {
+    var recs = agentWallets[ag];
+    for (var k = 0; k < recs.length; k++) {
+      var wr = recs[k];
+      var wm = (wr.date || '').replace(/\//g, '-').substring(0, 7);
+      if (filterMonth && wm !== filterMonth) continue;
+      var wl = '';
+      if (wr.type === 'deposit') wl = '存入';
+      else if (wr.type === 'cash_deposit') wl = '自存現金';
+      else if (wr.type === 'withdraw') wl = '提領';
+      flows.push({
+        date: wr.date || '',
+        source: ag,
+        type: wl,
+        amount: toNum(wr.amount),
+        sign: (wr.type === 'withdraw') ? -1 : 1,
+        note: wr.note || '',
+      });
+    }
+  }
+
+  if (flows.length === 0) {
     tbody.innerHTML = '';
     if (empty) empty.style.display = 'block';
     return;
@@ -7675,25 +7842,158 @@ function _renderFundTable() {
   if (empty) empty.style.display = 'none';
 
   // 按日期降序排列
-  var sorted = records.slice().sort(function(a, b) {
+  flows.sort(function(a, b) {
     return (b.date || '').localeCompare(a.date || '');
   });
 
-  var typeLabel = { deposit: '存入', cash_deposit: '現金存入', withdraw: '提領' };
-
   var html = '';
-  for (var i = 0; i < sorted.length; i++) {
-    var r = sorted[i];
-    var typeCls = (r.type === 'deposit' || r.type === 'cash_deposit') ? 'wf-deposit' : 'wf-withdraw';
-    var amtPrefix = (r.type === 'deposit' || r.type === 'cash_deposit') ? '+' : '-';
+  for (var f = 0; f < flows.length; f++) {
+    var flow = flows[f];
+    var isOut = flow.sign < 0;
+    var tc = isOut ? 'wf-withdraw' : 'wf-deposit';
+    var prefix = isOut ? '-' : '+';
     html += '<tr>' +
-      '<td>' + (r.date || '') + '</td>' +
-      '<td class="' + typeCls + '">' + (typeLabel[r.type] || r.type) + '</td>' +
-      '<td class="' + typeCls + '">' + amtPrefix + fmtMoney(toNum(r.amount)) + '</td>' +
-      '<td>' + (r.note || '') + '</td>' +
+      '<td>' + flow.date + '</td>' +
+      '<td class="wf-source">' + flow.source + '</td>' +
+      '<td class="' + tc + '">' + flow.type + '</td>' +
+      '<td class="' + tc + '" style="text-align:right">' + prefix + fmtMoney(flow.amount) + '</td>' +
+      '<td>' + flow.note + '</td>' +
       '</tr>';
   }
   tbody.innerHTML = html;
+}
+
+// ============================================================================
+// 公基金卡片
+// ============================================================================
+
+function _renderFundCard() {
+  var container = document.getElementById('wallet-fund-card');
+  if (!container) return;
+
+  var txs = State.get('txs');
+  var fundRecords = State.get('fundWithdrawals');
+  var filterMonth = _getWalletFilterMonth();
+
+  // 筛选基金记录
+  var filteredFunds = fundRecords;
+  var filteredTxs = txs;
+  if (filterMonth) {
+    filteredFunds = [];
+    for (var i = 0; i < fundRecords.length; i++) {
+      if ((fundRecords[i].date || '').replace(/\//g, '-').indexOf(filterMonth) === 0) {
+        filteredFunds.push(fundRecords[i]);
+      }
+    }
+    filteredTxs = [];
+    for (var j = 0; j < txs.length; j++) {
+      if ((txs[j].date || '').replace(/\//g, '-').indexOf(filterMonth) === 0) {
+        filteredTxs.push(txs[j]);
+      }
+    }
+  }
+
+  // 公基金余额 (全量)
+  var balance = calcFundBalance(txs, fundRecords);
+
+  // 汇总统计
+  var commFundSum = 0;     // 佣金产生的公基金
+  var depositSum = 0;      // 手动存入
+  var cashDepSum = 0;      // 自存现金
+  var withdrawSum = 0;     // 提领
+  for (var k = 0; k < filteredTxs.length; k++) {
+    commFundSum += toNum(filteredTxs[k].fund);
+  }
+  for (var m = 0; m < filteredFunds.length; m++) {
+    var fr = filteredFunds[m];
+    if (fr.type === 'deposit') depositSum += toNum(fr.amount);
+    else if (fr.type === 'cash_deposit') cashDepSum += toNum(fr.amount);
+    else if (fr.type === 'withdraw') withdrawSum += toNum(fr.amount);
+  }
+
+  // 构建明细列表 (合并佣金公基金 + 手动记录)
+  var details = [];
+
+  // 佣金公基金 (从交易中)
+  for (var d1 = 0; d1 < filteredTxs.length; d1++) {
+    var tx = filteredTxs[d1];
+    var fv = toNum(tx.fund);
+    if (fv > 0) {
+      details.push({
+        date: tx.date || '',
+        type: '佣金公基金',
+        amount: fv,
+        sign: 1,
+        note: (tx.agent || '') + ' 洗碼' + fmt(tx.volume) + '萬',
+      });
+    }
+  }
+
+  // 手动记录
+  for (var d2 = 0; d2 < filteredFunds.length; d2++) {
+    var fr2 = filteredFunds[d2];
+    var tl = '';
+    if (fr2.type === 'deposit') tl = '存入';
+    else if (fr2.type === 'cash_deposit') tl = '現金存入';
+    else if (fr2.type === 'withdraw') tl = '提領';
+    details.push({
+      date: fr2.date || '',
+      type: tl,
+      amount: toNum(fr2.amount),
+      sign: (fr2.type === 'withdraw') ? -1 : 1,
+      note: fr2.note || '',
+    });
+  }
+
+  // 按日期降序
+  details.sort(function(a, b) {
+    return (b.date || '').localeCompare(a.date || '');
+  });
+
+  // 渲染卡片
+  var html = '<div class="wallet-fund-card">' +
+    '<div class="wallet-fund-card-header">' +
+      '<span class="wf-name">🏦 公基金</span>' +
+      '<span class="wf-balance">' + fmtMoney(balance) + '</span>' +
+    '</div>' +
+    '<div class="wallet-fund-card-body">' +
+      '<table>' +
+        '<thead><tr><th>佣金公基金</th><th>存入</th><th>自存現金</th><th>提領</th></tr></thead>' +
+        '<tbody><tr>' +
+          '<td style="color:var(--success)">' + fmtMoney(commFundSum) + '</td>' +
+          '<td style="color:var(--success)">' + fmtMoney(depositSum) + '</td>' +
+          '<td style="color:var(--info)">' + fmtMoney(cashDepSum) + '</td>' +
+          '<td style="color:var(--danger)">' + fmtMoney(withdrawSum) + '</td>' +
+        '</tr></tbody>' +
+      '</table>' +
+    '</div>';
+
+  // 明细
+  if (details.length > 0) {
+    html += '<div class="wallet-fund-card-detail">' +
+      '<table>' +
+      '<thead><tr><th style="width:90px">日期</th><th>類型</th><th style="text-align:right">金額</th><th>備註</th></tr></thead>' +
+      '<tbody>';
+
+    for (var d3 = 0; d3 < details.length; d3++) {
+      var dt = details[d3];
+      var isOut = dt.sign < 0;
+      var tc = isOut ? 'var(--danger)' : 'var(--success)';
+      var prefix = isOut ? '-' : '+';
+      html += '<tr>' +
+        '<td>' + dt.date + '</td>' +
+        '<td style="color:' + tc + '">' + dt.type + '</td>' +
+        '<td style="text-align:right;color:' + tc + '">' + prefix + fmtMoney(dt.amount) + '</td>' +
+        '<td>' + dt.note + '</td>' +
+        '</tr>';
+    }
+
+    html += '</tbody></table></div>';
+  }
+
+  html += '</div>';
+
+  container.innerHTML = html;
 }
 
 // ============================================================================

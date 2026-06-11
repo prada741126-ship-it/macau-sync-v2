@@ -811,6 +811,34 @@ tr:hover td {
 .wallet-kpi-card .wk-value.wk-negative { color: var(--danger); }
 .wallet-kpi-card .wk-value.wk-gold { color: var(--gold-soft); }
 
+/* 时间筛选栏 */
+.wallet-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius);
+}
+
+.wallet-filter-bar label {
+  font-size: 13px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.wallet-filter-bar select {
+  padding: 5px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  font-size: 13px;
+  min-width: 150px;
+}
+
 .wallet-sections {
   display: flex;
   flex-direction: column;
@@ -826,6 +854,104 @@ tr:hover td {
   border-bottom: 1px solid var(--border-subtle);
 }
 
+/* 总钱包流水表 */
+#wallet-flow-table {
+  width: 100%;
+  font-size: 13px;
+}
+
+#wallet-flow-table th {
+  padding: 8px 12px;
+  color: var(--text-muted);
+  font-weight: 400;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+}
+
+#wallet-flow-table td {
+  padding: 7px 12px;
+  color: var(--text-secondary);
+}
+
+#wallet-flow-table td.wf-deposit  { color: var(--success); }
+#wallet-flow-table td.wf-withdraw { color: var(--danger); }
+#wallet-flow-table td.wf-source { font-size: 12px; color: var(--text-muted); }
+
+/* 公基金卡片 */
+.wallet-fund-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+}
+
+.wallet-fund-card-header {
+  background: var(--bg-elevated);
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wallet-fund-card-header .wf-name {
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.wallet-fund-card-header .wf-balance {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--gold-soft);
+}
+
+.wallet-fund-card-body {
+  padding: 8px 0;
+}
+
+.wallet-fund-card-body table {
+  width: 100%;
+  font-size: 12px;
+}
+
+.wallet-fund-card-body th {
+  padding: 5px 12px;
+  color: var(--text-muted);
+  font-weight: 400;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.wallet-fund-card-body td {
+  padding: 4px 12px;
+  color: var(--text-secondary);
+}
+
+.wallet-fund-card-detail {
+  padding: 0 12px 10px;
+}
+
+.wallet-fund-card-detail table {
+  width: 100%;
+  font-size: 11px;
+}
+
+.wallet-fund-card-detail th {
+  padding: 4px 8px;
+  color: var(--text-muted);
+  font-weight: 400;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.wallet-fund-card-detail td {
+  padding: 3px 8px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+/* 代理钱包卡片 grid */
 .wallet-agent-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -879,6 +1005,15 @@ tr:hover td {
 .wallet-agent-card-body td {
   padding: 4px 10px;
   color: var(--text-secondary);
+}
+
+/* 移除旧公基金表样式 (已被卡片替代) */
+#wallet-fund-table,
+#wallet-fund-table th,
+#wallet-fund-table td,
+#wallet-fund-table td.wf-deposit,
+#wallet-fund-table td.wf-withdraw {
+  /* 保留以备将来使用 */
 }
 
 #wallet-fund-table {
@@ -1451,17 +1586,35 @@ tr:nth-child(3) td:first-child::before {
         <div class="page" id="page-wallet">
           <div class="wallet-overview" id="wallet-overview"></div>
           <div class="decorative-line"></div>
+
+          <!-- 时间筛选器 -->
+          <div class="wallet-filter-bar">
+            <label>📅 時間篩選：</label>
+            <select id="wallet-month-filter" onchange="renderWallet()">
+              <option value="">全部時間</option>
+            </select>
+          </div>
+
           <div class="wallet-sections">
+            <!-- 总钱包流水（合并所有金流） -->
             <div class="wallet-section">
-              <h3 class="wallet-section-title">🏦 公基金流水</h3>
+              <h3 class="wallet-section-title">📊 總錢包流水</h3>
               <div class="table-scroll">
-                <table id="wallet-fund-table">
-                  <thead><tr><th>日期</th><th>類型</th><th>金額</th><th>備註</th></tr></thead>
+                <table id="wallet-flow-table">
+                  <thead><tr><th style="width:100px">日期</th><th style="width:90px">來源</th><th>類型</th><th style="text-align:right;width:110px">金額</th><th>備註</th></tr></thead>
                   <tbody></tbody>
                 </table>
               </div>
-              <div id="wallet-fund-empty" style="display:none;text-align:center;padding:20px;color:var(--text-muted)">暫無公基金記錄</div>
+              <div id="wallet-flow-empty" style="display:none;text-align:center;padding:20px;color:var(--text-muted)">暫無流水記錄</div>
             </div>
+
+            <!-- 公基金卡片 -->
+            <div class="wallet-section">
+              <h3 class="wallet-section-title">🏦 公基金</h3>
+              <div id="wallet-fund-card"></div>
+            </div>
+
+            <!-- 代理钱包明细 -->
             <div class="wallet-section">
               <h3 class="wallet-section-title">💰 代理錢包明細</h3>
               <div id="wallet-agent-cards"></div>
@@ -1635,6 +1788,6 @@ tr:nth-child(3) td:first-child::before {
   <input type="file" id="file-input" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
   <input type="file" id="rm-file-input" accept=".csv" style="display:none" onchange="rmHandleImport(event)">
 
-  <!-- BUILD: v13.0.0 | 2026-06-10 | 2026-06-11T05:44:36.202Z -->
+  <!-- BUILD: v13.0.0 | 2026-06-10 | 2026-06-11T10:48:39.831Z -->
 </body>
 </html>
