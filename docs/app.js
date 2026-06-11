@@ -6131,52 +6131,56 @@ function _renderAllTable(txs) {
 
   tbody.innerHTML = '';
   for (var i = 0; i < txs.length; i++) {
-    var tx = txs[i];
-    var tr = h('tr', {
-      'data-fbkey': tx._fbKey,
-      onclick: function() {
-        var key = this.getAttribute('data-fbkey');
-        Events.emit('tx:edit:request', key);
-      }
-    });
-    tr.style.cursor = 'pointer';
-
-    var cells = [
-      tx.type === 'cash' ? '現金' : '轉碼',
-      tx.date,
-      tx.agent,
-      tx.client || '-',
-      tx.venue || '-',
-      fmt(tx.volume) + '萬',
-      fmtMoney(tx.comm),
-      fmtMoney(tx.bonus),
-      fmtMoney(tx.drawn),
-      fmtMoney(tx.undrawn),
-      tx.note || '-',
-    ];
-
-    for (var j = 0; j < cells.length; j++) {
-      var td = h('td', {}, cells[j]);
-      tr.appendChild(td);
-    }
-
-    // 操作按钮
-    var tdBtn = h('td');
-    var delBtn = h('button', {
-      style: 'background:' + UI_COLORS.danger + ';color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px',
-      onclick: function(e) {
-        e.stopPropagation();
-        if (confirm('確定刪除這筆交易？')) {
-          deleteTx(tx._fbKey);
-          toastCRUDDone();
-          renderAll();
+    (function(tx) {
+      var tr = h('tr', {
+        'data-fbkey': tx._fbKey,
+        onclick: function() {
+          var key = this.getAttribute('data-fbkey');
+          Events.emit('tx:edit:request', key);
         }
-      }
-    }, '刪除');
-    tdBtn.appendChild(delBtn);
-    tr.appendChild(tdBtn);
+      });
+      tr.style.cursor = 'pointer';
 
-    tbody.appendChild(tr);
+      var cells = [
+        tx.type === 'cash' ? '現金' : '轉碼',
+        tx.date,
+        tx.agent,
+        tx.client || '-',
+        tx.venue || '-',
+        fmt(tx.volume) + '萬',
+        fmtMoney(tx.comm),
+        fmtMoney(tx.bonus),
+        fmtMoney(tx.drawn),
+        fmtMoney(tx.undrawn),
+        tx.note || '-',
+      ];
+
+      for (var j = 0; j < cells.length; j++) {
+        var td = h('td', {}, cells[j]);
+        tr.appendChild(td);
+      }
+
+      // 操作按钮 — 用 IIFE 捕捉当前 tx，避免闭包陷阱
+      var fbKey = tx._fbKey;
+      var tdBtn = h('td');
+      var delBtn = h('button', {
+        style: 'background:' + UI_COLORS.danger + ';color:white;border:none;padding:4px 10px;border-radius:4px;cursor:pointer;font-size:12px'
+      }, '刪除');
+      delBtn.onclick = (function(key) {
+        return function(e) {
+          e.stopPropagation();
+          if (confirm('確定刪除這筆交易？')) {
+            deleteTx(key);
+            toastCRUDDone();
+            renderAll();
+          }
+        };
+      })(fbKey);
+      tdBtn.appendChild(delBtn);
+      tr.appendChild(tdBtn);
+
+      tbody.appendChild(tr);
+    })(txs[i]);
   }
 }
 
