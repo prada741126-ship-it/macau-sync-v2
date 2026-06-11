@@ -6195,7 +6195,32 @@ function renderQuery() {
   doQuery();
 }
 
-/** 填充查詢頁下拉：代理、地點、月份 */
+/**
+ * 从交易数据中自动检测所有出现的年份
+ * @returns {number[]} 降序排列的年份列表
+ */
+function _detectYears() {
+  var txs = State.get('txs');
+  var years = {};
+  var now = new Date();
+  var currentYear = now.getFullYear();
+  // 确保至少有当前年
+  years[currentYear] = true;
+
+  for (var i = 0; i < txs.length; i++) {
+    var d = txs[i].date;
+    if (d && d.length >= 4) {
+      var y = parseInt(d.substring(0, 4));
+      if (!isNaN(y) && y >= 2020) years[y] = true;
+    }
+  }
+
+  var result = Object.keys(years).map(Number);
+  result.sort(function(a, b) { return b - a; }); // 降序：最新在前
+  return result;
+}
+
+/** 填充查詢頁下拉：代理、地點、月份（多年份） */
 function _populateQueryFilters() {
   // ---- 代理 ----
   var agentSel = document.getElementById('query-agent');
@@ -6229,18 +6254,8 @@ function _populateQueryFilters() {
     }
   }
 
-  // ---- 月份（1月-12月） ----
-  var monthSel = document.getElementById('query-month');
-  if (monthSel) {
-    monthSel.innerHTML = '<option value="">全部月份</option>';
-    for (var m = 1; m <= 12; m++) {
-      var mStr = m < 10 ? '0' + m : '' + m;
-      var opt = document.createElement('option');
-      opt.value = '2026-' + mStr;
-      opt.textContent = m + '月';
-      monthSel.appendChild(opt);
-    }
-  }
+  // ---- 月份（动态检测年份） ----
+  _refreshMonthDropdown();
 }
 
 /** 设定月份下拉默认值为当前月，默认填入日期范围为当月 */
@@ -6253,15 +6268,19 @@ function _setDefaultMonth() {
 
   var monthSel = document.getElementById('query-month');
   if (monthSel) {
+    // 尝试选中当前月份
+    var found = false;
     var opts = monthSel.options;
-    for (var i = 1; i < opts.length; i++) {
-      var text = opts[i].textContent;
-      var mm = parseInt(text);
-      var mmStr = mm < 10 ? '0' + mm : '' + mm;
-      opts[i].value = year + '-' + mmStr;
+    for (var i = 0; i < opts.length; i++) {
       if (opts[i].value === monthValue) {
         monthSel.selectedIndex = i;
+        found = true;
+        break;
       }
+    }
+    // 如果当前月份不在列表中（没有该年数据），默认不选
+    if (!found) {
+      monthSel.selectedIndex = 0;
     }
   }
 
@@ -6288,11 +6307,52 @@ function _highlightQuickBtn(type) {
 }
 
 function _quickBtnLabel(type) {
+  var now = new Date();
+  var y = now.getFullYear();
+  var m = now.getMonth() + 1;
   var map = {
     lastWeek: '上週', thisWeek: '本週', thisMonth: '本月',
     lastMonth: '上月', thisYear: '年度', custom: '自訂'
   };
   return map[type] || '';
+}
+
+/** 更新月份下拉的 option value 和选中状态（跨年支持）*/
+function _refreshMonthDropdown() {
+  var monthSel = document.getElementById('query-month');
+  if (!monthSel) return;
+
+  var currentValue = monthSel.value;  // 记住当前选择
+  var years = _detectYears();
+
+  monthSel.innerHTML = '<option value="">全部月份</option>';
+  for (var yi = 0; yi < years.length; yi++) {
+    var yr = years[yi];
+    var groupOpt = document.createElement('option');
+    groupOpt.value = '';
+    groupOpt.textContent = '── ' + yr + ' 年 ──';
+    groupOpt.disabled = true;
+    groupOpt.style.cssText = 'color:var(--tech-cyan);font-weight:700;font-size:12px;';
+    monthSel.appendChild(groupOpt);
+
+    for (var m = 1; m <= 12; m++) {
+      var mStr = m < 10 ? '0' + m : '' + m;
+      var monOpt = document.createElement('option');
+      monOpt.value = yr + '-' + mStr;
+      monOpt.textContent = '  ' + m + '月';
+      monthSel.appendChild(monOpt);
+    }
+  }
+
+  // 恢复选择
+  if (currentValue) {
+    for (var i = 0; i < monthSel.options.length; i++) {
+      if (monthSel.options[i].value === currentValue) {
+        monthSel.selectedIndex = i;
+        break;
+      }
+    }
+  }
 }
 
 /** 执行查询 — 根据代理选择路由到不同渲染模式 */
