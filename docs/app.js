@@ -6892,44 +6892,48 @@ function rmInitDateSels(prefix, defYear, defMonth, defDay) {
   if (!yEl || !mEl || !dEl) return;
 
   var today = new Date();
-  var curYear = today.getFullYear();
+  var curYear  = today.getFullYear();
+  // 若未指定默认值，默认使用今天
+  if (defYear  == null) defYear  = curYear;
+  if (defMonth == null) defMonth = (today.getMonth() + 1 < 10 ? '0' : '') + (today.getMonth() + 1);
+  if (defDay   == null) defDay   = (today.getDate() < 10 ? '0' : '') + today.getDate();
 
-  // 年：当年前后各2年
-  if (yEl.options.length === 0) {
-    var yOpt0 = document.createElement('option');
-    yOpt0.value = ''; yOpt0.textContent = '年'; yEl.appendChild(yOpt0);
-    for (var y = curYear - 1; y <= curYear + 2; y++) {
-      var yo = document.createElement('option');
-      yo.value = y; yo.textContent = y + '年'; yEl.appendChild(yo);
-    }
+  // 年：当年（默认选中）前后各1年 (总计 3 年)，force rebuild
+  yEl.innerHTML = '';
+  var yOpt0 = document.createElement('option');
+  yOpt0.value = ''; yOpt0.textContent = '年'; yEl.appendChild(yOpt0);
+  for (var y = curYear - 1; y <= curYear + 1; y++) {
+    var yo = document.createElement('option');
+    yo.value = y; yo.textContent = y + '年';
+    if (y == defYear) yo.selected = true;
+    yEl.appendChild(yo);
   }
   // 月
-  if (mEl.options.length === 0) {
-    var mOpt0 = document.createElement('option');
-    mOpt0.value = ''; mOpt0.textContent = '月'; mEl.appendChild(mOpt0);
-    for (var m = 1; m <= 12; m++) {
-      var mo = document.createElement('option');
-      mo.value = (m < 10 ? '0' : '') + m;
-      mo.textContent = m + '月';
-      mEl.appendChild(mo);
-    }
+  mEl.innerHTML = '';
+  var mOpt0 = document.createElement('option');
+  mOpt0.value = ''; mOpt0.textContent = '月'; mEl.appendChild(mOpt0);
+  for (var m = 1; m <= 12; m++) {
+    var mv = (m < 10 ? '0' : '') + m;
+    var mo = document.createElement('option');
+    mo.value = mv;
+    mo.textContent = m + '月';
+    if (mv == defMonth) mo.selected = true;
+    mEl.appendChild(mo);
   }
   // 日
-  if (dEl.options.length === 0) {
-    var dOpt0 = document.createElement('option');
-    dOpt0.value = ''; dOpt0.textContent = '日'; dEl.appendChild(dOpt0);
-    for (var d = 1; d <= 31; d++) {
-      var doo = document.createElement('option');
-      doo.value = (d < 10 ? '0' : '') + d;
-      doo.textContent = d + '日';
-      dEl.appendChild(doo);
-    }
+  dEl.innerHTML = '';
+  var dOpt0 = document.createElement('option');
+  dOpt0.value = ''; dOpt0.textContent = '日'; dEl.appendChild(dOpt0);
+  for (var d = 1; d <= 31; d++) {
+    var dv = (d < 10 ? '0' : '') + d;
+    var doo = document.createElement('option');
+    doo.value = dv;
+    doo.textContent = d + '日';
+    if (dv == defDay) doo.selected = true;
+    dEl.appendChild(doo);
   }
-
-  // 设置默认值
-  if (defYear) yEl.value = defYear;
-  if (defMonth) mEl.value = defMonth;
-  if (defDay) dEl.value = defDay;
+  // 同步到 hidden input
+  rmReadDateSels(prefix);
 }
 
 /** 读取三个 select 合成 YYYY/MM/DD 字符串，并同步 hidden input */
@@ -7102,17 +7106,19 @@ var RM = {
     RM.populateCasinoDropdown();
     RM.populateAgentDropdown();
 
-    // 初始化年月日下拉（只在首次时填充选项）
-    rmInitDateSels('rm-checkin');
-    rmInitDateSels('rm-checkout');
-
     if (id) {
+      // 编辑：先初始化日期下拉，再用订房数据覆盖
+      rmInitDateSels('rm-checkin');
+      rmInitDateSels('rm-checkout');
       var b = getBookingById(id);
       if (b) {
         RM._fillForm(b);
       }
     } else {
+      // 新建：先清空表单，再初始化日期下拉（默认为今天）
       RM._resetForm();
+      rmInitDateSels('rm-checkin');
+      rmInitDateSels('rm-checkout');
     }
 
     var modal = $('#rm-modal-bg');
