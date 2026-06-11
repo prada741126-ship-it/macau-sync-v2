@@ -8096,7 +8096,7 @@ function _renderFundCard() {
   });
 
   // 渲染卡片 — 复用代理钱包卡片样式 (.wallet-agent-card 系列)，视觉统一
-  var html = '<div class="wallet-agent-card">' +
+  var html = '<div class="wallet-agent-grid"><div class="wallet-agent-card">' +
     '<div class="wallet-agent-card-header">' +
       '<span class="wa-name">🏦 公基金</span>' +
       '<span class="wa-balance">' + fmtMoney(balance) + '</span>' +
@@ -8113,10 +8113,10 @@ function _renderFundCard() {
       '</table>' +
     '</div>';
 
-  // 明细 — 复用代理钱包卡片明细风格
+  // 明细 — 统一使用 .wallet-card-detail 样式
   if (details.length > 0) {
-    html += '<div style="padding:0 10px 8px">' +
-      '<table style="font-size:11px">' +
+    html += '<div class="wallet-card-detail">' +
+      '<table>' +
       '<thead><tr><th style="width:90px">日期</th><th>類型</th><th style="text-align:right">金額</th><th>備註</th></tr></thead>' +
       '<tbody>';
 
@@ -8126,17 +8126,17 @@ function _renderFundCard() {
       var tc = isOut ? 'var(--danger)' : 'var(--success)';
       var prefix = isOut ? '-' : '+';
       html += '<tr>' +
-        '<td style="font-size:11px">' + dt.date + '</td>' +
-        '<td style="font-size:11px;color:' + tc + '">' + dt.type + '</td>' +
-        '<td style="font-size:11px;text-align:right;color:' + tc + '">' + prefix + fmtMoney(dt.amount) + '</td>' +
-        '<td style="font-size:11px">' + dt.note + '</td>' +
+        '<td>' + dt.date + '</td>' +
+        '<td style="color:' + tc + '">' + dt.type + '</td>' +
+        '<td style="text-align:right;color:' + tc + '">' + prefix + fmtMoney(dt.amount) + '</td>' +
+        '<td>' + dt.note + '</td>' +
         '</tr>';
     }
 
     html += '</tbody></table></div>';
   }
 
-  html += '</div>';
+  html += '</div></div>';  // 关闭 .wallet-agent-card 和 .wallet-agent-grid
 
   container.innerHTML = html;
 }
@@ -8217,14 +8217,14 @@ function _renderAgentWalletCards() {
         '</table>' +
       '</div>';
 
-    // 钱包流水明细
+    // 钱包流水明细 — 统一使用 .wallet-card-detail 样式
     if (records.length > 0) {
       var sorted = records.slice().sort(function(a, b) {
         return (b.date || '').replace(/\//g, '-').localeCompare((a.date || '').replace(/\//g, '-'));
       });
       var typeLabel2 = { deposit: '存入', cash_deposit: '自存現金', withdraw: '提領' };
-      html += '<div style="padding:0 10px 8px">' +
-        '<table style="font-size:11px">' +
+      html += '<div class="wallet-card-detail">' +
+        '<table>' +
         '<thead><tr><th style="width:90px">日期</th><th>類型</th><th style="text-align:right">金額</th><th>備註</th></tr></thead>' +
         '<tbody>';
       for (var p = 0; p < sorted.length; p++) {
@@ -8232,10 +8232,10 @@ function _renderAgentWalletCards() {
         var tc = (wr.type === 'deposit' || wr.type === 'cash_deposit') ? 'var(--success)' : 'var(--danger)';
         var prefix = (wr.type === 'deposit' || wr.type === 'cash_deposit') ? '+' : '-';
         html += '<tr>' +
-          '<td style="font-size:11px">' + (wr.date || '') + '</td>' +
-          '<td style="font-size:11px;color:' + tc + '">' + (typeLabel2[wr.type] || wr.type) + '</td>' +
-          '<td style="font-size:11px;text-align:right;color:' + tc + '">' + prefix + fmtMoney(toNum(wr.amount)) + '</td>' +
-          '<td style="font-size:11px">' + (wr.note || '') + '</td>' +
+          '<td>' + (wr.date || '') + '</td>' +
+          '<td style="color:' + tc + '">' + (typeLabel2[wr.type] || wr.type) + '</td>' +
+          '<td style="text-align:right;color:' + tc + '">' + prefix + fmtMoney(toNum(wr.amount)) + '</td>' +
+          '<td>' + (wr.note || '') + '</td>' +
         '</tr>';
       }
       html += '</tbody></table></div>';

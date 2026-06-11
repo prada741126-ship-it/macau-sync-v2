@@ -1346,52 +1346,28 @@ tr.row-new {
 .wf-withdraw { color: var(--danger); }
 .wf-source { font-size: 12px; color: var(--text-muted); }
 
-/* 公基金卡片 */
-.wallet-fund-card {
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  overflow: hidden;
+/* 钱包卡片统一明细样式 (公基金 + 代理钱包共用) */
+.wallet-card-detail {
+  padding: 0 10px 10px;
+  border-top: 1px solid var(--border-subtle);
 }
-.wallet-fund-card-header {
-  background: var(--bg-elevated);
-  padding: 12px 16px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.wf-name { font-weight: 500; font-size: 14px; color: var(--text-primary); }
-.wf-balance { font-size: 18px; font-weight: 700; color: var(--gold-soft); }
-.wallet-fund-card-body {
-  padding: 8px 0;
-}
-.wallet-fund-card-body table { width: 100%; font-size: 12px; }
-.wallet-fund-card-body th {
-  padding: 5px 12px;
+.wallet-card-detail table { width: 100%; font-size: 11px; }
+.wallet-card-detail th {
+  padding: 5px 8px;
   color: var(--text-muted);
   font-weight: 500;
   text-align: left;
   border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-elevated);
 }
-.wallet-fund-card-body td {
-  padding: 4px 12px;
-  color: var(--text-secondary);
-}
-.wallet-fund-card-detail {
-  padding: 0 12px 10px;
-}
-.wallet-fund-card-detail table { width: 100%; font-size: 11px; }
-.wallet-fund-card-detail th {
+.wallet-card-detail td {
   padding: 4px 8px;
-  color: var(--text-muted);
-  font-weight: 400;
-  text-align: left;
-  border-bottom: 1px solid var(--border-subtle);
-}
-.wallet-fund-card-detail td {
-  padding: 3px 8px;
   color: var(--text-secondary);
   font-size: 11px;
+  border-bottom: 1px solid var(--border-dimmer);
+}
+.wallet-card-detail tr:last-child td {
+  border-bottom: none;
 }
 
 /* 代理钱包卡片 Grid */
@@ -2619,6 +2595,6 @@ tr.rank-1 td {
   <input type="file" id="file-input" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
   <input type="file" id="rm-file-input" accept=".csv" style="display:none" onchange="rmHandleImport(event)">
 
-  <!-- BUILD: v13.0.0 | 2026-06-11 | 2026-06-11T12:24:17.644Z -->
+  <!-- BUILD: v13.0.0 | 2026-06-11 | 2026-06-11T13:10:33.829Z -->
 </body>
 </html>
