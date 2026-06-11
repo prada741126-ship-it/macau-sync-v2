@@ -1303,9 +1303,14 @@ tr:nth-child(3) td:first-child::before {
               <input type="text" id="hc-filter-search" placeholder="搜索..." style="width:160px" oninput="hcFilter()">
               <button class="btn btn-sm btn-primary" onclick="hcOpenModal()">+ 新增房型</button>
             </div>
+            <div id="hc-batch-bar" style="display:none;background:#fff3cd;padding:6px 10px;margin-bottom:6px;border-radius:6px;border:1px solid #ffc107;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+              <span id="hc-batch-count" style="font-weight:bold;color:#856404">已選 0 項</span>
+              <button class="btn btn-sm btn-danger" onclick="hcBatchDelete()" style="background:#dc3545;color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px">批量刪除</button>
+              <button class="btn btn-sm" onclick="hcClearSelection()" style="background:#6c757d;color:#fff;border:none;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px">取消選取</button>
+            </div>
             <div class="table-scroll">
               <table class="hc-table">
-                <thead><tr><th>體系</th><th>酒店</th><th>CODE</th><th>房型</th><th>平日價</th><th>週末價</th><th>特殊日</th><th>門檻(萬)</th><th>操作</th></tr></thead>
+                <thead><tr><th style="width:36px"><input type="checkbox" id="hc-select-all" onchange="hcToggleSelectAll(this.checked)" title="全選/取消全選"></th><th>體系</th><th>酒店</th><th>CODE</th><th>房型</th><th>平日價</th><th>週末價</th><th>特殊日</th><th>門檻(萬)</th><th>操作</th></tr></thead>
                 <tbody></tbody>
               </table>
             </div>
@@ -1477,6 +1482,6 @@ tr:nth-child(3) td:first-child::before {
   <input type="file" id="file-input" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
   <input type="file" id="rm-file-input" accept=".csv" style="display:none" onchange="rmHandleImport(event)">
 
-  <!-- BUILD: v13.0.0 | 2026-06-10 | 2026-06-11T04:05:38.411Z -->
+  <!-- BUILD: v13.0.0 | 2026-06-10 | 2026-06-11T04:11:54.227Z -->
 </body>
 </html>

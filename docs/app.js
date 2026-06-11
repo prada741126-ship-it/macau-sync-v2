@@ -8340,8 +8340,13 @@ Events.on(EVENTS.TX_CREATED, function() { clearDraft(null); });
 Events.on(EVENTS.TX_UPDATED, function() { clearDraft(null); });
 
 // ============================================================================
-// 酒店设定列表渲染 & 筛选
+// 酒店设定列表渲染 & 筛选 (含批量選取)
 // ============================================================================
+
+/** 批量選取狀態: { fbKey: true } */
+var _hcSelected = {};
+/** 最後一次點擊的 fbKey (用於 Shift 範圍選取) */
+var _hcLastClicked = null;
 
 /**
  * 渲染酒店设定列表 (hc-table tbody)
@@ -8411,17 +8416,45 @@ function hcRender(filterCasino, filterHotel, filterSearch) {
   if (filtered.length === 0) {
     var emptyTr = document.createElement('tr');
     var emptyTd = document.createElement('td');
-    emptyTd.colSpan = 9;
+    emptyTd.colSpan = 10;
     emptyTd.style.cssText = 'text-align:center;padding:24px;color:' + UI_COLORS.textMuted;
     emptyTd.textContent = '暫無資料';
     emptyTr.appendChild(emptyTd);
     tbody.appendChild(emptyTr);
+    hcUpdateBatchBar();
     return;
   }
 
+  // 收集當前可見行的 fbKey 列表 (用於 Shift 範圍選取)
+  var visibleKeys = [];
   for (var i = 0; i < filtered.length; i++) {
-    (function(entry) {
+    visibleKeys.push(filtered[i]._fbKey);
+  }
+
+  for (var i = 0; i < filtered.length; i++) {
+    (function(entry, rowIndex) {
       var tr = document.createElement('tr');
+      tr.setAttribute('data-hc-key', entry._fbKey);
+
+      // 高亮已選行
+      if (_hcSelected[entry._fbKey]) {
+        tr.style.background = '#fff8e1';
+      }
+
+      // checkbox 列
+      var tdChk = document.createElement('td');
+      tdChk.style.cssText = 'text-align:center;padding:4px';
+      var chk = document.createElement('input');
+      chk.type = 'checkbox';
+      chk.checked = !!_hcSelected[entry._fbKey];
+      chk.setAttribute('data-hc-key', entry._fbKey);
+      chk.onclick = function(e) {
+        e.stopPropagation();
+        hcToggleRow(entry._fbKey, chk.checked, e);
+      };
+      tdChk.appendChild(chk);
+      tr.appendChild(tdChk);
+
       var cells = [
         entry.casino, entry.hotel, entry.code, entry.room,
         '¥' + entry.weekday, '¥' + entry.weekend, '¥' + entry.special,
@@ -8446,6 +8479,7 @@ function hcRender(filterCasino, filterHotel, filterSearch) {
         if (!confirm('確定刪除「' + entry.room + '」？')) return;
         var deleted = deleteHC(entry._fbKey);
         if (deleted) {
+          delete _hcSelected[entry._fbKey];
           showToast('已刪除', 'success');
           hcRender();
         } else {
@@ -8457,14 +8491,134 @@ function hcRender(filterCasino, filterHotel, filterSearch) {
       tdOp.appendChild(delBtn);
       tr.appendChild(tdOp);
       tbody.appendChild(tr);
-    })(filtered[i]);
+    })(filtered[i], i);
   }
+
+  // 更新全選 checkbox 狀態
+  hcUpdateSelectAllState(visibleKeys);
+  hcUpdateBatchBar();
+}
+
+/** 更新全選 checkbox 的三態 (全選/半選/未選) */
+function hcUpdateSelectAllState(visibleKeys) {
+  var sa = document.getElementById('hc-select-all');
+  if (!sa) return;
+  if (!visibleKeys) {
+    // 從 DOM 收集
+    var rows = document.querySelectorAll('.hc-table tbody tr[data-hc-key]');
+    visibleKeys = [];
+    for (var r = 0; r < rows.length; r++) {
+      visibleKeys.push(rows[r].getAttribute('data-hc-key'));
+    }
+  }
+  var selCount = 0;
+  for (var i = 0; i < visibleKeys.length; i++) {
+    if (_hcSelected[visibleKeys[i]]) selCount++;
+  }
+  if (selCount === 0) {
+    sa.checked = false;
+    sa.indeterminate = false;
+  } else if (selCount === visibleKeys.length && visibleKeys.length > 0) {
+    sa.checked = true;
+    sa.indeterminate = false;
+  } else {
+    sa.checked = false;
+    sa.indeterminate = true;
+  }
+}
+
+/** 更新批量操作欄顯示狀態 */
+function hcUpdateBatchBar() {
+  var bar = document.getElementById('hc-batch-bar');
+  var countEl = document.getElementById('hc-batch-count');
+  if (!bar) return;
+  var count = Object.keys(_hcSelected).length;
+  if (count > 0) {
+    bar.style.display = 'flex';
+    if (countEl) countEl.textContent = '已選 ' + count + ' 項';
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+/** 全選 / 取消全選 */
+function hcToggleSelectAll(checked) {
+  var rows = document.querySelectorAll('.hc-table tbody tr[data-hc-key]');
+  if (checked) {
+    for (var i = 0; i < rows.length; i++) {
+      var key = rows[i].getAttribute('data-hc-key');
+      _hcSelected[key] = true;
+    }
+  } else {
+    _hcSelected = {};
+  }
+  // 刷新列表 (保留篩選狀態)
+  hcRender();
+}
+
+/** 切換單行選取 (支援 Shift 範圍選取) */
+function hcToggleRow(fbKey, checked, event) {
+  if (event && event.shiftKey && _hcLastClicked) {
+    // Shift 範圍選取：選取 _hcLastClicked 到 fbKey 之間的所有行
+    var rows = document.querySelectorAll('.hc-table tbody tr[data-hc-key]');
+    var keys = [];
+    for (var i = 0; i < rows.length; i++) {
+      keys.push(rows[i].getAttribute('data-hc-key'));
+    }
+    var idxA = keys.indexOf(_hcLastClicked);
+    var idxB = keys.indexOf(fbKey);
+    if (idxA >= 0 && idxB >= 0) {
+      var from = Math.min(idxA, idxB);
+      var to   = Math.max(idxA, idxB);
+      for (var j = from; j <= to; j++) {
+        _hcSelected[keys[j]] = checked;
+      }
+    }
+  } else {
+    _hcSelected[fbKey] = checked;
+    if (!checked) delete _hcSelected[fbKey];
+  }
+  _hcLastClicked = fbKey;
+  // 刷新列表 (保留篩選狀態)
+  hcRender();
+}
+
+/** 清除所有選取 */
+function hcClearSelection() {
+  _hcSelected = {};
+  _hcLastClicked = null;
+  var sa = document.getElementById('hc-select-all');
+  if (sa) { sa.checked = false; sa.indeterminate = false; }
+  hcRender();
+}
+
+/** 批量刪除所選項目 */
+function hcBatchDelete() {
+  var keys = Object.keys(_hcSelected);
+  if (keys.length === 0) {
+    showToast('請先選取要刪除的項目', 'warning');
+    return;
+  }
+  if (!confirm('確定要批量刪除 ' + keys.length + ' 筆酒店設定？此操作無法復原！')) return;
+
+  var deleted = 0;
+  for (var i = 0; i < keys.length; i++) {
+    var result = deleteHC(keys[i]);
+    if (result) deleted++;
+  }
+  _hcSelected = {};
+  _hcLastClicked = null;
+  showToast('已刪除 ' + deleted + ' 筆', deleted > 0 ? 'success' : 'error');
+  hcRender();
 }
 
 /**
  * 酒店设定筛选 (HTML onchange/oninput 调用)
+ * 筛选变更时自动清除选取 (避免跨筛选混淆)
  */
 function hcFilter() {
+  _hcSelected = {};
+  _hcLastClicked = null;
   hcRender();
 }
 
