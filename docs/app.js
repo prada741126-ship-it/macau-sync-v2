@@ -9405,6 +9405,40 @@ function hcFilter() {
   hcRender();
 }
 
+// ============================================================================
+// 登入桥接
+// ============================================================================
+
+/**
+ * 登入按钮回调 — 读取密码调用 checkPassword，显示错误/剩余次数
+ */
+function _v13LoginFallback() {
+  var inputEl = document.getElementById('pw-input');
+  var errorEl = document.getElementById('pw-error');
+  var attemptsEl = document.getElementById('pw-attempts');
+  var pw = inputEl ? inputEl.value : '';
+
+  if (!pw) {
+    if (errorEl) errorEl.textContent = '請輸入密碼';
+    if (attemptsEl) attemptsEl.textContent = '';
+    return;
+  }
+
+  var result = (typeof checkPassword === 'function') ? checkPassword(pw) : { success: false, error: '認證模組未載入' };
+
+  if (result.success) {
+    if (errorEl) errorEl.textContent = '';
+    if (attemptsEl) attemptsEl.textContent = '';
+  } else {
+    if (errorEl) errorEl.textContent = result.error || '驗證失敗';
+    // 自动从 _pwAttempts(若可访问) 或直接隐藏
+    if (attemptsEl) {
+      var maxAttempts = (typeof CONFIG !== 'undefined' && CONFIG.MAX_PW_ATTEMPTS) ? CONFIG.MAX_PW_ATTEMPTS : 3;
+      attemptsEl.textContent = '剩餘 ' + maxAttempts + ' 次機會';
+    }
+  }
+}
+
 // 监听 HC 更新事件，自动刷新列表
 Events.on(EVENTS.HC_CONFIG_UPDATED, function() {
   var panel = document.getElementById('room-tab-config');
