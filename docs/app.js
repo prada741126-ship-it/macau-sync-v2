@@ -8704,7 +8704,7 @@ function deleteFundRecord(fbKey) {
   if (!confirm('確定刪除此筆公基金記錄？')) return;
   var result = deleteFund(fbKey);
   if (result) {
-    showToast('已刪除', 'success');
+    toastCRUDDone();
     refreshAllViews();
   } else {
     showToast('刪除失敗', 'error');
@@ -8716,7 +8716,7 @@ function deleteAgentWallet(agent, fbKey) {
   if (!confirm('確定刪除此筆錢包記錄？')) return;
   var result = deleteWallet(agent, fbKey);
   if (result) {
-    showToast('已刪除', 'success');
+    toastCRUDDone();
     refreshAllViews();
   } else {
     showToast('刪除失敗', 'error');
