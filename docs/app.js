@@ -6880,6 +6880,85 @@ function _renderSummaryTable(txs) {
  * 对照档: 第七节模块18 (24 方法)
  */
 
+// ============================================================================
+// 日期下拉辅助 (年/月/日 三联动 select)
+// ============================================================================
+
+/** 填充年月日三个 select。prefix: 'rm-checkin' or 'rm-checkout' */
+function rmInitDateSels(prefix, defYear, defMonth, defDay) {
+  var yEl = $('#' + prefix + '-y');
+  var mEl = $('#' + prefix + '-m');
+  var dEl = $('#' + prefix + '-d');
+  if (!yEl || !mEl || !dEl) return;
+
+  var today = new Date();
+  var curYear = today.getFullYear();
+
+  // 年：当年前后各2年
+  if (yEl.options.length === 0) {
+    var yOpt0 = document.createElement('option');
+    yOpt0.value = ''; yOpt0.textContent = '年'; yEl.appendChild(yOpt0);
+    for (var y = curYear - 1; y <= curYear + 2; y++) {
+      var yo = document.createElement('option');
+      yo.value = y; yo.textContent = y + '年'; yEl.appendChild(yo);
+    }
+  }
+  // 月
+  if (mEl.options.length === 0) {
+    var mOpt0 = document.createElement('option');
+    mOpt0.value = ''; mOpt0.textContent = '月'; mEl.appendChild(mOpt0);
+    for (var m = 1; m <= 12; m++) {
+      var mo = document.createElement('option');
+      mo.value = (m < 10 ? '0' : '') + m;
+      mo.textContent = m + '月';
+      mEl.appendChild(mo);
+    }
+  }
+  // 日
+  if (dEl.options.length === 0) {
+    var dOpt0 = document.createElement('option');
+    dOpt0.value = ''; dOpt0.textContent = '日'; dEl.appendChild(dOpt0);
+    for (var d = 1; d <= 31; d++) {
+      var doo = document.createElement('option');
+      doo.value = (d < 10 ? '0' : '') + d;
+      doo.textContent = d + '日';
+      dEl.appendChild(doo);
+    }
+  }
+
+  // 设置默认值
+  if (defYear) yEl.value = defYear;
+  if (defMonth) mEl.value = defMonth;
+  if (defDay) dEl.value = defDay;
+}
+
+/** 读取三个 select 合成 YYYY/MM/DD 字符串，并同步 hidden input */
+function rmReadDateSels(prefix) {
+  var y = ($('#' + prefix + '-y') || {}).value;
+  var m = ($('#' + prefix + '-m') || {}).value;
+  var d = ($('#' + prefix + '-d') || {}).value;
+  var val = (y && m && d) ? (y + '/' + m + '/' + d) : '';
+  var hidden = $('#' + prefix);
+  if (hidden) hidden.value = val;
+  return val;
+}
+
+/** 根据 YYYY/MM/DD 字符串反填三个 select */
+function rmSetDateSels(prefix, dateStr) {
+  if (!dateStr) return;
+  // 支持 YYYY/MM/DD 和 YYYY-MM-DD
+  var parts = dateStr.replace(/-/g, '/').split('/');
+  if (parts.length !== 3) return;
+  var yEl = $('#' + prefix + '-y');
+  var mEl = $('#' + prefix + '-m');
+  var dEl = $('#' + prefix + '-d');
+  if (yEl) yEl.value = parts[0];
+  if (mEl) mEl.value = parts[1].length === 1 ? '0' + parts[1] : parts[1];
+  if (dEl) dEl.value = parts[2].length === 1 ? '0' + parts[2] : parts[2];
+  var hidden = $('#' + prefix);
+  if (hidden) hidden.value = dateStr;
+}
+
 var RM = {
   bookings: [],
   lastId: 0,
@@ -6964,10 +7043,17 @@ var RM = {
 
   // ===== 联动 =====
   onCasinoChange: function() {
-    var casino = $('#rm-casino').value;
+    var casino = ($('#rm-casino') || {}).value;
     RM.populateHotelDropdown(casino);
-    $('#rm-hotel').value = '';
-    $('#rm-room').innerHTML = '<option value="">選擇房型</option>';
+    // 自动选第一间酒店（跳过「選擇酒店」空选项）
+    var hotelSel = $('#rm-hotel');
+    if (hotelSel && hotelSel.options.length > 1) {
+      hotelSel.selectedIndex = 1;
+      RM.onHotelChange();
+    } else {
+      if (hotelSel) hotelSel.value = '';
+      if ($('#rm-room')) $('#rm-room').innerHTML = '<option value="">選擇房型</option>';
+    }
   },
 
   onHotelChange: function() {
@@ -6989,8 +7075,9 @@ var RM = {
 
   // ===== 计算 =====
   calcNights: function() {
-    var checkIn = ($('#rm-checkin') || {}).value;
-    var checkOut = ($('#rm-checkout') || {}).value;
+    // 先从三联动 select 合成日期并写入 hidden input
+    var checkIn  = rmReadDateSels('rm-checkin');
+    var checkOut = rmReadDateSels('rm-checkout');
     var nights = calcNights(checkIn, checkOut);
     if ($('#rm-nights')) $('#rm-nights').value = nights;
     RM.calcTotal();
@@ -7015,6 +7102,10 @@ var RM = {
     RM.populateCasinoDropdown();
     RM.populateAgentDropdown();
 
+    // 初始化年月日下拉（只在首次时填充选项）
+    rmInitDateSels('rm-checkin');
+    rmInitDateSels('rm-checkout');
+
     if (id) {
       var b = getBookingById(id);
       if (b) {
@@ -7035,6 +7126,10 @@ var RM = {
   },
 
   saveForm: function() {
+    // 先合成日期值到 hidden input
+    rmReadDateSels('rm-checkin');
+    rmReadDateSels('rm-checkout');
+
     var data = {
       agent:    ($('#rm-agent') || {}).value,
       client:   ($('#rm-client') || {}).value,
@@ -7156,6 +7251,9 @@ var RM = {
       var el = $('#' + id);
       if (el) el.value = fields[id] != null ? fields[id] : '';
     }
+    // 日期反填到三联动 select
+    rmSetDateSels('rm-checkin',  b.checkIn);
+    rmSetDateSels('rm-checkout', b.checkOut);
     // 联动
     RM.populateHotelDropdown(b.casino);
     if ($('#rm-hotel')) $('#rm-hotel').value = b.hotel;
@@ -7170,6 +7268,12 @@ var RM = {
     for (var i = 0; i < ids.length; i++) {
       var el = $('#' + ids[i]);
       if (el) el.value = '';
+    }
+    // 清空日期三联动
+    var dateSels = ['rm-checkin-y','rm-checkin-m','rm-checkin-d','rm-checkout-y','rm-checkout-m','rm-checkout-d'];
+    for (var j = 0; j < dateSels.length; j++) {
+      var ds = $('#' + dateSels[j]);
+      if (ds) ds.value = '';
     }
   },
 

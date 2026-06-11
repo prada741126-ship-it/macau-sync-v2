@@ -1419,8 +1419,22 @@ tr:nth-child(3) td:first-child::before {
       <div class="form-row"><label>體系</label><select id="rm-casino" onchange="rmOnCasinoChange()"><option value="">選擇體系</option></select></div>
       <div class="form-row"><label>酒店</label><select id="rm-hotel" onchange="rmOnHotelChange()"><option value="">選擇酒店</option></select></div>
       <div class="form-row"><label>房型</label><select id="rm-room" onchange="rmOnRoomChange()"><option value="">選擇房型</option></select></div>
-      <div class="form-row"><label>入住</label><input type="date" id="rm-checkin" onchange="rmCalcNights()"></div>
-      <div class="form-row"><label>退房</label><input type="date" id="rm-checkout" onchange="rmCalcNights()"></div>
+      <div class="form-row"><label>入住</label>
+        <span class="date-sel-group">
+          <select id="rm-checkin-y" onchange="rmCalcNights()" style="width:72px"></select>
+          <select id="rm-checkin-m" onchange="rmCalcNights()" style="width:54px"></select>
+          <select id="rm-checkin-d" onchange="rmCalcNights()" style="width:54px"></select>
+        </span>
+        <input type="hidden" id="rm-checkin">
+      </div>
+      <div class="form-row"><label>退房</label>
+        <span class="date-sel-group">
+          <select id="rm-checkout-y" onchange="rmCalcNights()" style="width:72px"></select>
+          <select id="rm-checkout-m" onchange="rmCalcNights()" style="width:54px"></select>
+          <select id="rm-checkout-d" onchange="rmCalcNights()" style="width:54px"></select>
+        </span>
+        <input type="hidden" id="rm-checkout">
+      </div>
       <div class="form-row"><label>天數</label><input type="number" id="rm-nights" readonly></div>
       <div class="form-row"><label>單價</label><input type="number" id="rm-price" onchange="rmCalcTotal()"></div>
       <div class="form-row"><label>總費用</label><input type="number" id="rm-total" readonly></div>
@@ -1463,6 +1477,6 @@ tr:nth-child(3) td:first-child::before {
   <input type="file" id="file-input" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
   <input type="file" id="rm-file-input" accept=".csv" style="display:none" onchange="rmHandleImport(event)">
 
-  <!-- BUILD: v13.0.0 | 2026-06-10 | 2026-06-11T03:32:03.340Z -->
+  <!-- BUILD: v13.0.0 | 2026-06-10 | 2026-06-11T03:42:06.171Z -->
 </body>
 </html>
