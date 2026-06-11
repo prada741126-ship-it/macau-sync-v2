@@ -3540,6 +3540,15 @@ function addAgentFromMgr() {
 // ============================================================================
 
 /**
+ * 归一化日期字符串为 YYYY-MM 格式 (用于 month 字段)
+ * 支持 YYYY/MM/DD 和 YYYY-MM-DD 输入
+ */
+function normalizeMonth(dateStr) {
+  if (!dateStr) return nowStr().substring(0, 7); // "YYYY-MM"
+  return dateStr.replace(/\//g, '-').substring(0, 7);
+}
+
+/**
  * 新增订房
  * @param {object} data
  * @returns {object}
@@ -3554,7 +3563,7 @@ function createBooking(data) {
     id:            State.nextId('booking'),
     _fbKey:        fbKey,
     date:          data.date || nowStr(),
-    month:         (data.checkIn || nowStr()).substring(0, 7),
+    month:         normalizeMonth(data.checkIn),
     agent:         data.agent || '',
     client:        data.client || '',
     casino:        data.casino || '',
@@ -3607,7 +3616,7 @@ function updateBooking(fbKey, data) {
         // 重算
         b.nights = calcNights(b.checkIn, b.checkOut);
         b.totalCost = b.nights * b.pricePerNight;
-        b.month = b.checkIn.substring(0, 7);
+        b.month = normalizeMonth(b.checkIn);
         updated = b;
         break;
       }
@@ -7071,12 +7080,12 @@ function rmInitDateSels(prefix, defYear, defMonth, defDay) {
   rmReadDateSels(prefix);
 }
 
-/** 读取三个 select 合成 YYYY/MM/DD 字符串，并同步 hidden input */
+/** 读取三个 select 合成 YYYY-MM-DD 字符串，并同步 hidden input */
 function rmReadDateSels(prefix) {
   var y = ($('#' + prefix + '-y') || {}).value;
   var m = ($('#' + prefix + '-m') || {}).value;
   var d = ($('#' + prefix + '-d') || {}).value;
-  var val = (y && m && d) ? (y + '/' + m + '/' + d) : '';
+  var val = (y && m && d) ? (y + '-' + m + '-' + d) : '';
   var hidden = $('#' + prefix);
   if (hidden) hidden.value = val;
   return val;
@@ -7217,10 +7226,7 @@ var RM = {
     // 先从三联动 select 合成日期并写入 hidden input
     var checkIn  = rmReadDateSels('rm-checkin');
     var checkOut = rmReadDateSels('rm-checkout');
-    // 归一化日期分隔符: YYYY/MM/DD → YYYY-MM-DD，确保跨浏览器 Date 解析正确
-    var ci = checkIn.replace(/\//g, '-');
-    var co = checkOut.replace(/\//g, '-');
-    var nights = calcNights(ci, co);
+    var nights = calcNights(checkIn, checkOut);
     if ($('#rm-nights')) $('#rm-nights').value = nights;
     RM.calcTotal();
   },
