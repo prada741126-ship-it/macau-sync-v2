@@ -779,6 +779,129 @@ tr:hover td {
   padding: 6px 0;
 }
 
+/* ===== 总钱包页 ===== */
+.wallet-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.wallet-kpi-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-lg);
+  padding: 14px 16px;
+  text-align: center;
+}
+
+.wallet-kpi-card .wk-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.wallet-kpi-card .wk-value {
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.wallet-kpi-card .wk-value.wk-positive { color: var(--success); }
+.wallet-kpi-card .wk-value.wk-negative { color: var(--danger); }
+.wallet-kpi-card .wk-value.wk-gold { color: var(--gold-soft); }
+
+.wallet-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.wallet-section-title {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.wallet-agent-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.wallet-agent-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--border-radius-lg);
+  overflow: hidden;
+}
+
+.wallet-agent-card-header {
+  background: var(--bg-elevated);
+  padding: 10px 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.wallet-agent-card-header .wa-name {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.wallet-agent-card-header .wa-balance {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--gold-soft);
+}
+
+.wallet-agent-card-body {
+  padding: 8px 0;
+}
+
+.wallet-agent-card-body table {
+  width: 100%;
+  font-size: 12px;
+}
+
+.wallet-agent-card-body th {
+  padding: 5px 10px;
+  color: var(--text-muted);
+  font-weight: 400;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.wallet-agent-card-body td {
+  padding: 4px 10px;
+  color: var(--text-secondary);
+}
+
+#wallet-fund-table {
+  width: 100%;
+  font-size: 13px;
+}
+
+#wallet-fund-table th {
+  padding: 8px 12px;
+  color: var(--text-muted);
+  font-weight: 400;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+#wallet-fund-table td {
+  padding: 7px 12px;
+  color: var(--text-secondary);
+}
+
+#wallet-fund-table td.wf-deposit  { color: var(--success); }
+#wallet-fund-table td.wf-withdraw { color: var(--danger); }
+
 /* css/china-theme.css */
 /* ============================================================================
  * v13 中国风主题 (隐性克制)
@@ -1101,6 +1224,7 @@ tr:nth-child(3) td:first-child::before {
         <div class="sb-item" data-page="query"><span class="icon">🔍</span><span>查詢</span></div>
         <div class="sb-item" data-page="summary"><span class="icon">📈</span><span>統計</span></div>
         <div class="sb-item" data-page="room"><span class="icon">🏨</span><span>房務系統</span></div>
+        <div class="sb-item" data-page="wallet"><span class="icon">💳</span><span>總錢包</span></div>
         <div class="sb-divider"></div>
         <div class="sb-item" onclick="openFundModal()"><span class="icon">🏦</span><span>公基金</span></div>
         <div class="sb-item" onclick="openWalletModal()"><span class="icon">💰</span><span>代理錢包</span></div>
@@ -1121,6 +1245,7 @@ tr:nth-child(3) td:first-child::before {
       <div class="nav-item" data-page="query"><span class="icon">🔍</span>查詢</div>
       <div class="nav-item" data-page="summary"><span class="icon">📈</span>統計</div>
       <div class="nav-item" data-page="room"><span class="icon">🏨</span>房務</div>
+      <div class="nav-item" data-page="wallet"><span class="icon">💳</span>錢包</div>
     </div>
 
     <!-- MAIN CONTENT -->
@@ -1322,6 +1447,29 @@ tr:nth-child(3) td:first-child::before {
           </div>
         </div>
 
+        <!-- ===== 总钱包页 ===== -->
+        <div class="page" id="page-wallet">
+          <div class="wallet-overview" id="wallet-overview"></div>
+          <div class="decorative-line"></div>
+          <div class="wallet-sections">
+            <div class="wallet-section">
+              <h3 class="wallet-section-title">🏦 公基金流水</h3>
+              <div class="table-scroll">
+                <table id="wallet-fund-table">
+                  <thead><tr><th>日期</th><th>類型</th><th>金額</th><th>備註</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              <div id="wallet-fund-empty" style="display:none;text-align:center;padding:20px;color:var(--text-muted)">暫無公基金記錄</div>
+            </div>
+            <div class="wallet-section">
+              <h3 class="wallet-section-title">💰 代理錢包明細</h3>
+              <div id="wallet-agent-cards"></div>
+              <div id="wallet-agent-empty" style="display:none;text-align:center;padding:20px;color:var(--text-muted)">暫無代理錢包記錄</div>
+            </div>
+          </div>
+        </div>
+
       </div><!-- /page-scroll -->
 
     </div><!-- /main-content -->
@@ -1487,6 +1635,6 @@ tr:nth-child(3) td:first-child::before {
   <input type="file" id="file-input" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
   <input type="file" id="rm-file-input" accept=".csv" style="display:none" onchange="rmHandleImport(event)">
 
-  <!-- BUILD: v13.0.0 | 2026-06-10 | 2026-06-11T05:24:38.007Z -->
+  <!-- BUILD: v13.0.0 | 2026-06-10 | 2026-06-11T05:38:52.474Z -->
 </body>
 </html>
