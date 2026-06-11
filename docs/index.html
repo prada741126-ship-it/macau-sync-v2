@@ -1588,11 +1588,21 @@ tr:nth-child(3) td:first-child::before {
           <div class="decorative-line"></div>
 
           <!-- 时间筛选器 -->
-          <div class="wallet-filter-bar">
-            <label>📅 時間篩選：</label>
-            <select id="wallet-month-filter" onchange="renderWallet()">
-              <option value="">全部時間</option>
-            </select>
+          <div class="toolbar" style="margin-bottom:0">
+            <div class="tf-row">
+              <span class="tf-row-label">📅 時間篩選</span>
+              <button class="btn btn-sm tf-btn" onclick="walletQuickFilter('lastWeek')">上週</button>
+              <button class="btn btn-sm tf-btn" onclick="walletQuickFilter('thisWeek')">本週</button>
+              <button class="btn btn-sm tf-btn" onclick="walletQuickFilter('thisMonth')">本月</button>
+              <button class="btn btn-sm tf-btn" onclick="walletQuickFilter('lastMonth')">上月</button>
+              <button class="btn btn-sm tf-btn" onclick="walletQuickFilter('thisYear')">年度</button>
+              <button class="btn btn-sm tf-btn" onclick="walletQuickFilter('custom')">自訂</button>
+              <span style="display:none" id="wallet-date-range">
+                從 <input type="date" id="wallet-date-from" style="width:130px" onchange="renderWallet()">
+                到 <input type="date" id="wallet-date-to" style="width:130px" onchange="renderWallet()">
+              </span>
+              <span id="wallet-date-display" style="margin-left:8px;font-size:12px;color:var(--text-muted)"></span>
+            </div>
           </div>
 
           <div class="wallet-sections">
@@ -1788,6 +1798,6 @@ tr:nth-child(3) td:first-child::before {
   <input type="file" id="file-input" accept=".csv" style="display:none" onchange="handleCSVImport(event)">
   <input type="file" id="rm-file-input" accept=".csv" style="display:none" onchange="rmHandleImport(event)">
 
-  <!-- BUILD: v13.0.0 | 2026-06-10 | 2026-06-11T10:48:39.831Z -->
+  <!-- BUILD: v13.0.0 | 2026-06-10 | 2026-06-11T11:01:59.250Z -->
 </body>
 </html>

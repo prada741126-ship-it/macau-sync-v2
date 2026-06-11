@@ -7549,24 +7549,184 @@ function rmImportCSV()       { RM.importCSV(); }
 
 // src/pages/wallet.js
 /**
- * v13 总钱包页面 (v2 重构)
- * 
+ * v13 总钱包页面 (v3 — 快捷按钮时间筛选器)
+ *
  * 依赖: State, Events, calc/finance.js, utils/format.js
- * 
+ *
  * 页面内容:
  * 1. KPI 总览卡片 (总钱包余额、公基金余额、代理钱包总额、总存入、总提领)
- * 2. 时间筛选器 (独立月份)
+ * 2. 快捷时间筛选器 (本週/上週/本月/上月/年度/自訂 — 与查询页一致)
  * 3. 总钱包流水 (合并: 公基金记录 + 代理钱包记录 + 交易佣金产生的码粮/公基金)
  * 4. 公基金卡片 (卡片式, 含汇总 + 流水明细)
  * 5. 代理钱包卡片 (同原设计)
+ *
+ * 筛选逻辑: 取代旧的月份下拉，改用日期范围 (dateFrom/dateTo)
+ *   - 快捷按钮设定 dateFrom/dateTo，存入 State
+ *   - 各渲染函数从 State 读取范围进行筛选
+ *   - 「全部時間」时 dateFrom='' && dateTo='' → 不过滤
  */
+
+// ============================================================================
+// 快捷时间筛选器 (与查询页一致)
+// ============================================================================
+
+/** 快捷按钮点击处理 */
+function walletQuickFilter(type) {
+  _highlightWalletQuickBtn(type);
+
+  var now = new Date();
+  var dateFrom = '';
+  var dateTo = '';
+  var customRange = document.getElementById('wallet-date-range');
+  if (customRange) customRange.style.display = 'none';
+
+  var pad2 = function(n) { return n < 10 ? '0' + n : '' + n; };
+  var ymd = function(d) {
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate());
+  };
+
+  switch (type) {
+    case 'lastWeek': {
+      // 上周一 ~ 上周日
+      var dow = now.getDay() || 7;
+      var lastMon = new Date(now);
+      lastMon.setDate(now.getDate() - dow - 6);
+      var lastSun = new Date(lastMon);
+      lastSun.setDate(lastMon.getDate() + 6);
+      dateFrom = ymd(lastMon);
+      dateTo = ymd(lastSun);
+      break;
+    }
+    case 'thisWeek': {
+      // 本周一 ~ 今天
+      var dow2 = now.getDay() || 7;
+      var thisMon = new Date(now);
+      thisMon.setDate(now.getDate() - dow2 + 1);
+      dateFrom = ymd(thisMon);
+      dateTo = ymd(now);
+      break;
+    }
+    case 'thisMonth': {
+      // 本月1日 ~ 今天
+      dateFrom = now.getFullYear() + '-' + pad2(now.getMonth() + 1) + '-01';
+      dateTo = ymd(now);
+      break;
+    }
+    case 'lastMonth': {
+      // 上月1日 ~ 上月最后一天
+      var firstDayLM = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      var lastDayLM = new Date(now.getFullYear(), now.getMonth(), 0);
+      dateFrom = ymd(firstDayLM);
+      dateTo = ymd(lastDayLM);
+      break;
+    }
+    case 'thisYear': {
+      // 今年1/1 ~ 今天
+      dateFrom = now.getFullYear() + '-01-01';
+      dateTo = ymd(now);
+      break;
+    }
+    case 'custom': {
+      if (customRange) customRange.style.display = '';
+      var fromEl = document.getElementById('wallet-date-from');
+      var toEl = document.getElementById('wallet-date-to');
+      // 保留上次的值，或默认今天
+      if (fromEl && !fromEl.value) fromEl.value = ymd(now);
+      if (toEl && !toEl.value) toEl.value = ymd(now);
+      // custom 模式：不在这里设定范围，等用户选日期后 onchange 触发 renderWallet
+      _updateWalletDateDisplay();
+      renderWallet();
+      return;
+    }
+    default: {
+      // 全部時間
+      break;
+    }
+  }
+
+  // 设定日期输入框的值（非 custom 模式）
+  var fromEl2 = document.getElementById('wallet-date-from');
+  var toEl2 = document.getElementById('wallet-date-to');
+  if (fromEl2 && dateFrom) fromEl2.value = dateFrom;
+  if (toEl2 && dateTo) toEl2.value = dateTo;
+
+  _updateWalletDateDisplay();
+  renderWallet();
+}
+
+/** 高亮当前活跃的快捷按钮 */
+function _highlightWalletQuickBtn(type) {
+  var btns = document.querySelectorAll('#page-wallet .tf-btn');
+  for (var i = 0; i < btns.length; i++) {
+    btns[i].classList.remove('active');
+  }
+  if (!type || type === 'all') return;
+  var label = _walletQuickBtnLabel(type);
+  for (var j = 0; j < btns.length; j++) {
+    if (btns[j].textContent.trim() === label) {
+      btns[j].classList.add('active');
+    }
+  }
+}
+
+/** 快捷按钮 type → 显示文字 */
+function _walletQuickBtnLabel(type) {
+  var map = {
+    lastWeek: '上週', thisWeek: '本週', thisMonth: '本月',
+    lastMonth: '上月', thisYear: '年度', custom: '自訂'
+  };
+  return map[type] || '';
+}
+
+/** 更新页面上的日期范围显示文字 */
+function _updateWalletDateDisplay() {
+  var disp = document.getElementById('wallet-date-display');
+  if (!disp) return;
+  var fromEl = document.getElementById('wallet-date-from');
+  var toEl = document.getElementById('wallet-date-to');
+  var from = fromEl ? fromEl.value : '';
+  var to = toEl ? toEl.value : '';
+  if (from && to) {
+    disp.textContent = '📅 ' + from + ' ～ ' + to;
+  } else if (from) {
+    disp.textContent = '📅 ' + from + ' 起';
+  } else if (to) {
+    disp.textContent = '📅 至 ' + to;
+  } else {
+    disp.textContent = '📅 全部時間';
+  }
+}
+
+/** 从输入框读取当前筛选范围 {dateFrom, dateTo} (空字符串=不限制) */
+function _getWalletDateRange() {
+  var fromEl = document.getElementById('wallet-date-from');
+  var toEl = document.getElementById('wallet-date-to');
+  return {
+    dateFrom: (fromEl && fromEl.value) ? fromEl.value : '',
+    dateTo: (toEl && toEl.value) ? toEl.value : '',
+  };
+}
+
+/** 判断一条记录的日期是否在当前筛选范围内 */
+function _walletDateInRange(dateStr, dateFrom, dateTo) {
+  if (!dateStr) return false;
+  // 归一化日期格式为 YYYY-MM-DD
+  var ds = (dateStr || '').replace(/\//g, '-');
+  if (dateFrom && ds < dateFrom) return false;
+  if (dateTo && ds > dateTo) return false;
+  return true;
+}
+
+// ============================================================================
+// 渲染入口
+// ============================================================================
 
 /**
  * 渲染总钱包页面
  */
 function renderWallet() {
   try {
-    _populateMonthFilter();
+    _updateWalletDateDisplay();
     _renderWalletKPIs();
     _renderFlowTable();
     _renderFundCard();
@@ -7574,56 +7734,6 @@ function renderWallet() {
   } catch (e) {
     console.error('[v13:wallet] renderWallet error:', e);
   }
-}
-
-// ============================================================================
-// 月份筛选器
-// ============================================================================
-
-function _getWalletFilterMonth() {
-  var sel = document.getElementById('wallet-month-filter');
-  return (sel && sel.value) ? sel.value : '';
-}
-
-function _populateMonthFilter() {
-  var sel = document.getElementById('wallet-month-filter');
-  if (!sel) return;
-
-  var txs = State.get('txs');
-  var funds = State.get('fundWithdrawals');
-  var wallets = State.get('agentWallets');
-
-  // 收集所有月份
-  var months = {};
-  for (var i = 0; i < txs.length; i++) {
-    var m = (txs[i].date || '').replace(/\//g, '-').substring(0, 7);
-    if (m) months[m] = true;
-  }
-  for (var j = 0; j < funds.length; j++) {
-    var m2 = (funds[j].date || '').replace(/\//g, '-').substring(0, 7);
-    if (m2) months[m2] = true;
-  }
-  for (var ag in wallets) {
-    var recs = wallets[ag];
-    for (var k = 0; k < recs.length; k++) {
-      var m3 = (recs[k].date || '').replace(/\//g, '-').substring(0, 7);
-      if (m3) months[m3] = true;
-    }
-  }
-
-  var list = Object.keys(months).sort().reverse();
-
-  // 保持当前选中值
-  var currentVal = sel.value;
-
-  var html = '<option value="">全部時間</option>';
-  for (var n = 0; n < list.length; n++) {
-    var selAttr = (list[n] === currentVal) ? ' selected' : '';
-    html += '<option value="' + list[n] + '"' + selAttr + '>' + list[n] + '</option>';
-  }
-  sel.innerHTML = html;
-  // 恢复选中
-  if (currentVal) sel.value = currentVal;
 }
 
 // ============================================================================
@@ -7637,37 +7747,16 @@ function _renderWalletKPIs() {
   var txs = State.get('txs');
   var fundRecords = State.get('fundWithdrawals');
   var agentWallets = State.get('agentWallets');
-  var filterMonth = _getWalletFilterMonth();
+  var range = _getWalletDateRange();
 
-  // 筛选交易
-  var filteredTxs = txs;
-  var filteredFunds = fundRecords;
+  // 筛选（KPI 按日期范围筛选）
+  var filteredTxs = _filterByDateRange(txs, 'date', range);
+  var filteredFunds = _filterByDateRange(fundRecords, 'date', range);
   var filteredAWs = {};
-  if (filterMonth) {
-    filteredTxs = [];
-    for (var i = 0; i < txs.length; i++) {
-      if ((txs[i].date || '').replace(/\//g, '-').indexOf(filterMonth) === 0) {
-        filteredTxs.push(txs[i]);
-      }
-    }
-    filteredFunds = [];
-    for (var j = 0; j < fundRecords.length; j++) {
-      if ((fundRecords[j].date || '').replace(/\//g, '-').indexOf(filterMonth) === 0) {
-        filteredFunds.push(fundRecords[j]);
-      }
-    }
-    for (var ag in agentWallets) {
-      var recs = agentWallets[ag];
-      var filt = [];
-      for (var k = 0; k < recs.length; k++) {
-        if ((recs[k].date || '').replace(/\//g, '-').indexOf(filterMonth) === 0) {
-          filt.push(recs[k]);
-        }
-      }
-      if (filt.length > 0) filteredAWs[ag] = filt;
-    }
-  } else {
-    filteredAWs = agentWallets;
+  for (var ag in agentWallets) {
+    var recs = agentWallets[ag];
+    var filt = _filterByDateRange(recs, 'date', range);
+    if (filt.length > 0) filteredAWs[ag] = filt;
   }
 
   // 公基金余额 (全量、不受筛选影响 — KPI 应该是全量)
@@ -7747,6 +7836,22 @@ function _renderWalletKPIs() {
 }
 
 // ============================================================================
+// 工具函式
+// ============================================================================
+
+/** 按日期范围筛选数组 (arr[field] 支持 YYYY/MM/DD 和 YYYY-MM-DD) */
+function _filterByDateRange(arr, dateField, range) {
+  if (!range.dateFrom && !range.dateTo) return arr;
+  var result = [];
+  for (var i = 0; i < arr.length; i++) {
+    if (_walletDateInRange(arr[i][dateField], range.dateFrom, range.dateTo)) {
+      result.push(arr[i]);
+    }
+  }
+  return result;
+}
+
+// ============================================================================
 // 总钱包流水 (合并所有金流来源)
 // ============================================================================
 
@@ -7758,16 +7863,15 @@ function _renderFlowTable() {
   var txs = State.get('txs');
   var fundRecords = State.get('fundWithdrawals');
   var agentWallets = State.get('agentWallets');
-  var filterMonth = _getWalletFilterMonth();
+  var range = _getWalletDateRange();
 
   // 构建统一流水条目
   var flows = [];
 
   // 1) 公基金记录
-  for (var i = 0; i < fundRecords.length; i++) {
-    var fr = fundRecords[i];
-    var fm = (fr.date || '').replace(/\//g, '-').substring(0, 7);
-    if (filterMonth && fm !== filterMonth) continue;
+  var filteredFunds = _filterByDateRange(fundRecords, 'date', range);
+  for (var i = 0; i < filteredFunds.length; i++) {
+    var fr = filteredFunds[i];
     var typeLabel = (fr.type === 'deposit' || fr.type === 'cash_deposit') ? '存入' : '提領';
     if (fr.type === 'cash_deposit') typeLabel = '現金存入';
     flows.push({
@@ -7781,10 +7885,9 @@ function _renderFlowTable() {
   }
 
   // 2) 交易佣金产生的码粮和公基金
-  for (var j = 0; j < txs.length; j++) {
-    var tx = txs[j];
-    var tm = (tx.date || '').replace(/\//g, '-').substring(0, 7);
-    if (filterMonth && tm !== filterMonth) continue;
+  var filteredTxs = _filterByDateRange(txs, 'date', range);
+  for (var j = 0; j < filteredTxs.length; j++) {
+    var tx = filteredTxs[j];
     var fundVal = toNum(tx.fund);
     var bonusVal = toNum(tx.bonus);
     var volNote = '洗碼' + fmt(tx.volume) + '萬';
@@ -7816,8 +7919,7 @@ function _renderFlowTable() {
     var recs = agentWallets[ag];
     for (var k = 0; k < recs.length; k++) {
       var wr = recs[k];
-      var wm = (wr.date || '').replace(/\//g, '-').substring(0, 7);
-      if (filterMonth && wm !== filterMonth) continue;
+      if (!_walletDateInRange(wr.date, range.dateFrom, range.dateTo)) continue;
       var wl = '';
       if (wr.type === 'deposit') wl = '存入';
       else if (wr.type === 'cash_deposit') wl = '自存現金';
@@ -7843,7 +7945,7 @@ function _renderFlowTable() {
 
   // 按日期降序排列
   flows.sort(function(a, b) {
-    return (b.date || '').localeCompare(a.date || '');
+    return (b.date || '').replace(/\//g, '-').localeCompare((a.date || '').replace(/\//g, '-'));
   });
 
   var html = '';
@@ -7873,25 +7975,11 @@ function _renderFundCard() {
 
   var txs = State.get('txs');
   var fundRecords = State.get('fundWithdrawals');
-  var filterMonth = _getWalletFilterMonth();
+  var range = _getWalletDateRange();
 
-  // 筛选基金记录
-  var filteredFunds = fundRecords;
-  var filteredTxs = txs;
-  if (filterMonth) {
-    filteredFunds = [];
-    for (var i = 0; i < fundRecords.length; i++) {
-      if ((fundRecords[i].date || '').replace(/\//g, '-').indexOf(filterMonth) === 0) {
-        filteredFunds.push(fundRecords[i]);
-      }
-    }
-    filteredTxs = [];
-    for (var j = 0; j < txs.length; j++) {
-      if ((txs[j].date || '').replace(/\//g, '-').indexOf(filterMonth) === 0) {
-        filteredTxs.push(txs[j]);
-      }
-    }
-  }
+  // 筛选
+  var filteredFunds = _filterByDateRange(fundRecords, 'date', range);
+  var filteredTxs = _filterByDateRange(txs, 'date', range);
 
   // 公基金余额 (全量)
   var balance = calcFundBalance(txs, fundRecords);
@@ -7947,7 +8035,7 @@ function _renderFundCard() {
 
   // 按日期降序
   details.sort(function(a, b) {
-    return (b.date || '').localeCompare(a.date || '');
+    return (b.date || '').replace(/\//g, '-').localeCompare((a.date || '').replace(/\//g, '-'));
   });
 
   // 渲染卡片
@@ -8075,7 +8163,7 @@ function _renderAgentWalletCards() {
     // 钱包流水明细
     if (records.length > 0) {
       var sorted = records.slice().sort(function(a, b) {
-        return (b.date || '').localeCompare(a.date || '');
+        return (b.date || '').replace(/\//g, '-').localeCompare((a.date || '').replace(/\//g, '-'));
       });
       var typeLabel2 = { deposit: '存入', cash_deposit: '自存現金', withdraw: '提領' };
       html += '<div style="padding:0 10px 8px">' +
