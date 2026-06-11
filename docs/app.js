@@ -3803,7 +3803,7 @@ var PRESET_CONFIG = [
   { casino: '銀河',     hotel: '麗絲卡爾登', code: 'RC07', room: '麗絲卡爾登總統套房',     weekday: 16000, weekend: 16000, special: 18000, threshold: 200 },
 
   // ========= 永利 — 保留原预设 =========
-  { casino: '永利',     hotel: '永利澳門',   code: 'WL1', room: '標準套房', weekday: 2200, weekend: 2800, special: 3500, threshold: 100 },
+  { casino: '永利',     hotel: '永利皇宮',   code: 'WL1', room: '標準套房', weekday: 2200, weekend: 2800, special: 3500, threshold: 100 },
 
   // ========= 上葡京 — 保留原预设 =========
   { casino: '上葡京',   hotel: '上葡京',     code: 'GP1', room: '標準套房', weekday: 1800, weekend: 2200, special: 2800, threshold: 80 },
