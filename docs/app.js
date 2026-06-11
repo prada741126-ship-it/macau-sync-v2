@@ -62,6 +62,7 @@ var STORAGE_KEYS = {
   RM_BOOKINGS:       'rm_bookings',            // 订房资料
   RM_LAST_ID:        'rm_last_id',             // 最后订房ID
   HC_CONFIG:         'hc_config',              // 酒店设定
+  HC_PRESET_VERSION: 'hc_preset_version',      // 酒店预设版本号
   APP_VERSION:       'macau_app_version',      // 版本快取清除
 };
 
@@ -1653,6 +1654,12 @@ var Store = (function() {
   function loadHCConfig() {
     return load(STORAGE_KEYS.HC_CONFIG, false) || [];
   }
+  function saveHCPresetVersion(ver) {
+    localStorage.setItem(STORAGE_KEYS.HC_PRESET_VERSION, String(ver));
+  }
+  function loadHCPresetVersion() {
+    return localStorage.getItem(STORAGE_KEYS.HC_PRESET_VERSION) || '';
+  }
 
   // --- 版本 ---
   function saveAppVersion(ver) {
@@ -1761,6 +1768,8 @@ var Store = (function() {
     loadBookingLastId:  loadBookingLastId,
     saveHCConfig:       saveHCConfig,
     loadHCConfig:       loadHCConfig,
+    saveHCPresetVersion:saveHCPresetVersion,
+    loadHCPresetVersion:loadHCPresetVersion,
     saveAppVersion:     saveAppVersion,
     loadAppVersion:     loadAppVersion,
     // 全量
@@ -3672,6 +3681,8 @@ function getAllBookings() {
  * 事件: emit hcConfig:updated
  */
 
+var PRESET_VERSION = '2';
+
 // ============================================================================
 // 预设数据 (对照档模块20)
 // 数据来源：用户提供的三张酒店房价图片
@@ -3911,6 +3922,7 @@ function resetHCToPreset() {
   State.set('hotelConfig', preset);
   State.resetNextId('hc', preset.length + 1);
   Store.saveHCConfig(preset);
+  Store.saveHCPresetVersion(PRESET_VERSION);
   Events.emit(EVENTS.HC_CONFIG_UPDATED, preset);
   return preset.length;
 }
@@ -8339,9 +8351,22 @@ Events.on('tx:edit:request', function(fbKey) {
 Events.on(EVENTS.TX_CREATED, function() { clearDraft(null); });
 Events.on(EVENTS.TX_UPDATED, function() { clearDraft(null); });
 
-// ============================================================================
-// 酒店设定列表渲染 & 筛选 (含批量選取)
-// ============================================================================
+/**
+ * 手動重置為最新預設數據 (UI 按鈕調用)
+ */
+function hcResetPreset() {
+  if (!confirm('確定要重置為最新預設數據嗎？\n這會刪除現有所有酒店設定（' + State.get('hotelConfig').length + ' 筆），並載入 ' + PRESET_CONFIG.length + ' 筆預設數據。此操作無法復原！')) return;
+  try {
+    var count = resetHCToPreset();
+    showToast('已重置 ' + count + ' 筆酒店預設數據', 'success');
+    _hcSelected = {};
+    _hcLastClicked = null;
+    hcRender();
+  } catch(e) {
+    console.error('[v13:hc] reset preset error:', e);
+    showToast('重置失敗', 'error');
+  }
+}
 
 /** 批量選取狀態: { fbKey: true } */
 var _hcSelected = {};
@@ -8733,8 +8758,17 @@ Events.on(EVENTS.HC_CONFIG_UPDATED, function() {
         State.set('workingMonth', currentMonth());
       }
 
-      // 如果酒店设定为空，自动写入预设数据 (首次使用)
-      if (State.get('hotelConfig').length === 0) {
+      // 酒店设定预设版本检测: 版本变化时自动重置（覆盖旧数据）
+      var currentPresetVer = Store.loadHCPresetVersion();
+      if (currentPresetVer !== PRESET_VERSION) {
+        try {
+          var presetCount = resetHCToPreset();
+          console.log('[v13:app] Hotel preset updated: v' + currentPresetVer + ' → v' + PRESET_VERSION + ', loaded ' + presetCount + ' entries');
+        } catch(e) {
+          console.error('[v13:app] Failed to update hotel preset:', e);
+        }
+      } else if (State.get('hotelConfig').length === 0) {
+        // 首次使用（空数据）也加载预设
         try {
           var presetCount = resetHCToPreset();
           console.log('[v13:app] Hotel config preset loaded: ' + presetCount + ' entries');
