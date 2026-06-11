@@ -205,6 +205,7 @@ var PAGES = [
   { id: 'page-query',     name: 'query',     label: '查詢',      icon: '\uD83D\uDD0D', shortcut: '3' },
   { id: 'page-summary',   name: 'summary',   label: '統計',      icon: '\uD83D\uDCCA', shortcut: '4' },
   { id: 'page-room',      name: 'room',      label: '房務系統',   icon: '\uD83C\uDFE8', shortcut: '5' },
+  { id: 'page-wallet',    name: 'wallet',    label: '總錢包',     icon: '\uD83D\uDCB3', shortcut: '6' },
 ];
 
 // ============================================================================
@@ -216,6 +217,7 @@ var SHORTCUTS = [
   { keys: 'Ctrl+3',    desc: '切換到查詢頁',        action: 'page:query' },
   { keys: 'Ctrl+4',    desc: '切換到統計頁',        action: 'page:summary' },
   { keys: 'Ctrl+5',    desc: '切換到房務系統頁',    action: 'page:room' },
+  { keys: 'Ctrl+6',    desc: '切換到總錢包頁',      action: 'page:wallet' },
   { keys: 'Ctrl+N',    desc: '新增交易',            action: 'tx:new' },
   { keys: 'Ctrl+S',    desc: '儲存資料',            action: 'sync:manual' },
   { keys: 'Ctrl+F',    desc: '快速搜索',            action: 'search:focus' },
@@ -5699,7 +5701,7 @@ function initKeyboard() {
 
 /**
  * 切换到指定页面
- * @param {string} pageName - 'overview'|'all'|'query'|'summary'|'room'
+ * @param {string} pageName - 'overview'|'all'|'query'|'summary'|'room'|'wallet'
  * @param {Element} [sidebarEl] - 侧边栏点击的元素
  */
 function showPage(pageName, sidebarEl) {
@@ -5778,6 +5780,9 @@ function _refreshPage(pageName) {
       break;
     case 'room':
       if (typeof RM !== 'undefined' && RM.render) RM.render();
+      break;
+    case 'wallet':
+      if (typeof renderWallet === 'function') renderWallet();
       break;
   }
 }
@@ -7542,6 +7547,262 @@ function rmRender()          { RM.render(); }
 function rmExportCSV()       { RM.exportCSV(); }
 function rmImportCSV()       { RM.importCSV(); }
 
+// src/pages/wallet.js
+/**
+ * v13 总钱包页面
+ * 
+ * 依赖: State, Events, calc/finance.js, utils/format.js
+ * 
+ * 页面内容:
+ * 1. KPI 总览卡片 (总钱包余额、公基金余额、代理钱包总额、总存入、总提领)
+ * 2. 公基金流水明细表
+ * 3. 代理钱包明细 (每代理一卡片，含汇总 + 流水)
+ */
+
+/**
+ * 渲染总钱包页面
+ */
+function renderWallet() {
+  try {
+    _renderWalletKPIs();
+    _renderFundTable();
+    _renderAgentWalletCards();
+  } catch (e) {
+    console.error('[v13:wallet] renderWallet error:', e);
+  }
+}
+
+// ============================================================================
+// KPI 统计卡片
+// ============================================================================
+
+function _renderWalletKPIs() {
+  var container = document.getElementById('wallet-overview');
+  if (!container) return;
+
+  var txs = State.get('txs');
+  var fundRecords = State.get('fundWithdrawals');
+  var agentWallets = State.get('agentWallets');
+
+  // 公基金余额
+  var fundBalance = calcFundBalance(txs, fundRecords);
+
+  // 代理钱包总额
+  var agentTotal = 0;
+  var allAgents = {};
+  for (var i = 0; i < txs.length; i++) {
+    var a = txs[i].agent;
+    if (a) allAgents[a] = true;
+  }
+  for (var ag in agentWallets) {
+    allAgents[ag] = true;
+  }
+  for (var name in allAgents) {
+    agentTotal += calcAgentBalance(name, txs, agentWallets);
+  }
+
+  // 总钱包余额 (使用统一入口，与 topbar / query 页保持一致)
+  var totalWallet = getTotalWallet();
+
+  // 总存入 (公基金存入 + 代理钱包存入 + 自存现金)
+  var totalDeposit = 0;
+  for (var j = 0; j < fundRecords.length; j++) {
+    var fr = fundRecords[j];
+    if (fr.type === 'deposit' || fr.type === 'cash_deposit') {
+      totalDeposit += toNum(fr.amount);
+    }
+  }
+  for (var ag2 in agentWallets) {
+    var recs = agentWallets[ag2];
+    for (var k = 0; k < recs.length; k++) {
+      if (recs[k].type === 'deposit' || recs[k].type === 'cash_deposit') {
+        totalDeposit += toNum(recs[k].amount);
+      }
+    }
+  }
+
+  // 总提领 (公基金提领 + 代理钱包提领)
+  var totalWithdraw = 0;
+  for (var m = 0; m < fundRecords.length; m++) {
+    if (fundRecords[m].type === 'withdraw') {
+      totalWithdraw += toNum(fundRecords[m].amount);
+    }
+  }
+  for (var ag3 in agentWallets) {
+    var recs2 = agentWallets[ag3];
+    for (var n = 0; n < recs2.length; n++) {
+      if (recs2[n].type === 'withdraw') {
+        totalWithdraw += toNum(recs2[n].amount);
+      }
+    }
+  }
+
+  var cards = [
+    { label: '總錢包餘額', value: fmtMoney(totalWallet), cls: 'wk-gold' },
+    { label: '公基金餘額',  value: fmtMoney(fundBalance), cls: 'wk-positive' },
+    { label: '代理錢包總額', value: fmtMoney(agentTotal), cls: 'wk-positive' },
+    { label: '總存入',      value: fmtMoney(totalDeposit), cls: 'wk-positive' },
+    { label: '總提領',      value: fmtMoney(totalWithdraw), cls: 'wk-negative' },
+  ];
+
+  var html = '';
+  for (var c = 0; c < cards.length; c++) {
+    html += '<div class="wallet-kpi-card">' +
+      '<div class="wk-label">' + cards[c].label + '</div>' +
+      '<div class="wk-value ' + cards[c].cls + '">' + cards[c].value + '</div>' +
+      '</div>';
+  }
+  container.innerHTML = html;
+}
+
+// ============================================================================
+// 公基金流水表
+// ============================================================================
+
+function _renderFundTable() {
+  var tbody = document.querySelector('#wallet-fund-table tbody');
+  var empty = document.getElementById('wallet-fund-empty');
+  if (!tbody) return;
+
+  var records = State.get('fundWithdrawals');
+
+  if (!records || records.length === 0) {
+    tbody.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+
+  if (empty) empty.style.display = 'none';
+
+  // 按日期降序排列
+  var sorted = records.slice().sort(function(a, b) {
+    return (b.date || '').localeCompare(a.date || '');
+  });
+
+  var typeLabel = { deposit: '存入', cash_deposit: '現金存入', withdraw: '提領' };
+
+  var html = '';
+  for (var i = 0; i < sorted.length; i++) {
+    var r = sorted[i];
+    var typeCls = (r.type === 'deposit' || r.type === 'cash_deposit') ? 'wf-deposit' : 'wf-withdraw';
+    var amtPrefix = (r.type === 'deposit' || r.type === 'cash_deposit') ? '+' : '-';
+    html += '<tr>' +
+      '<td>' + (r.date || '') + '</td>' +
+      '<td class="' + typeCls + '">' + (typeLabel[r.type] || r.type) + '</td>' +
+      '<td class="' + typeCls + '">' + amtPrefix + fmtMoney(toNum(r.amount)) + '</td>' +
+      '<td>' + (r.note || '') + '</td>' +
+      '</tr>';
+  }
+  tbody.innerHTML = html;
+}
+
+// ============================================================================
+// 代理钱包明细卡片
+// ============================================================================
+
+function _renderAgentWalletCards() {
+  var container = document.getElementById('wallet-agent-cards');
+  var empty = document.getElementById('wallet-agent-empty');
+  if (!container) return;
+
+  var txs = State.get('txs');
+  var agentWallets = State.get('agentWallets');
+
+  // 收集所有代理
+  var agents = {};
+  for (var i = 0; i < txs.length; i++) {
+    var a = txs[i].agent;
+    if (a) agents[a] = true;
+  }
+  for (var ag in agentWallets) {
+    agents[ag] = true;
+  }
+
+  var agentList = Object.keys(agents).sort();
+  if (agentList.length === 0) {
+    container.innerHTML = '';
+    if (empty) empty.style.display = 'block';
+    return;
+  }
+
+  if (empty) empty.style.display = 'none';
+
+  var html = '<div class="wallet-agent-grid">';
+
+  for (var m = 0; m < agentList.length; m++) {
+    var agentName = agentList[m];
+    var balance = calcAgentBalance(agentName, txs, agentWallets);
+
+    // 从交易中计算该代理的码粮和现金寄放
+    var bonusSum = 0;
+    var cashSum = 0;
+    for (var n = 0; n < txs.length; n++) {
+      if (txs[n].agent === agentName) {
+        bonusSum += toNum(txs[n].bonus);
+        cashSum += toNum(txs[n].cash) || 0;
+      }
+    }
+
+    // 从钱包记录中计算各项
+    var records = agentWallets[agentName] || [];
+    var awDeposit = 0;
+    var awCashDep = 0;
+    var awWithdraw = 0;
+    for (var k = 0; k < records.length; k++) {
+      if (records[k].type === 'deposit') awDeposit += toNum(records[k].amount);
+      else if (records[k].type === 'cash_deposit') awCashDep += toNum(records[k].amount);
+      else if (records[k].type === 'withdraw') awWithdraw += toNum(records[k].amount);
+    }
+
+    html += '<div class="wallet-agent-card">' +
+      '<div class="wallet-agent-card-header">' +
+        '<span class="wa-name">' + agentName + '</span>' +
+        '<span class="wa-balance">' + fmtMoney(balance) + '</span>' +
+      '</div>' +
+      '<div class="wallet-agent-card-body">' +
+        '<table>' +
+          '<thead><tr><th>碼糧累計</th><th>現金寄放</th><th>存入</th><th>自存現金</th><th>提領</th></tr></thead>' +
+          '<tbody><tr>' +
+            '<td>' + fmtMoney(bonusSum) + '</td>' +
+            '<td>' + fmtMoney(cashSum) + '</td>' +
+            '<td style="color:var(--success)">' + fmtMoney(awDeposit) + '</td>' +
+            '<td style="color:var(--info)">' + fmtMoney(awCashDep) + '</td>' +
+            '<td style="color:var(--danger)">' + fmtMoney(awWithdraw) + '</td>' +
+          '</tr></tbody>' +
+        '</table>' +
+      '</div>';
+
+    // 钱包流水明细
+    if (records.length > 0) {
+      var sorted = records.slice().sort(function(a, b) {
+        return (b.date || '').localeCompare(a.date || '');
+      });
+      var typeLabel2 = { deposit: '存入', cash_deposit: '自存現金', withdraw: '提領' };
+      html += '<div style="padding:0 10px 8px">' +
+        '<table style="font-size:11px">' +
+        '<thead><tr><th style="width:90px">日期</th><th>類型</th><th style="text-align:right">金額</th><th>備註</th></tr></thead>' +
+        '<tbody>';
+      for (var p = 0; p < sorted.length; p++) {
+        var wr = sorted[p];
+        var tc = (wr.type === 'deposit' || wr.type === 'cash_deposit') ? 'var(--success)' : 'var(--danger)';
+        var prefix = (wr.type === 'deposit' || wr.type === 'cash_deposit') ? '+' : '-';
+        html += '<tr>' +
+          '<td style="font-size:11px">' + (wr.date || '') + '</td>' +
+          '<td style="font-size:11px;color:' + tc + '">' + (typeLabel2[wr.type] || wr.type) + '</td>' +
+          '<td style="font-size:11px;text-align:right;color:' + tc + '">' + prefix + fmtMoney(toNum(wr.amount)) + '</td>' +
+          '<td style="font-size:11px">' + (wr.note || '') + '</td>' +
+        '</tr>';
+      }
+      html += '</tbody></table></div>';
+    }
+
+    html += '</div>';
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+}
+
 // src/charts/trend.js
 /**
  * v13 图表模块 - 每日洗码量趋势
@@ -8917,6 +9178,11 @@ Events.on(EVENTS.HC_CONFIG_UPDATED, function() {
     // 初始化房务系统
     try { if (typeof RM !== 'undefined') RM.init(); } catch(e) { console.error('[v13:app] RM.init error:', e); }
 
+    try { if (typeof renderWallet === 'function') renderWallet(); } catch(e) { console.error('[v13:app] renderWallet error:', e); }
+
+    // 更新 topbar 总钱包
+    try { _updateTopbarWallet(); } catch(e) {}
+
     // 每日自动备份
     try { autoBackupCheck(); } catch(e) {}
 
@@ -9006,15 +9272,36 @@ Events.on(EVENTS.HC_CONFIG_UPDATED, function() {
       if (page === 'all') renderAll();
       if (page === 'query') doQuery();
       if (page === 'summary') renderSummary();
+      _updateTopbarWallet();
     });
 
-    Events.on(EVENTS.TX_CREATED, function() { renderAll(); renderOverview(); });
-    Events.on(EVENTS.TX_UPDATED, function() { renderAll(); renderOverview(); });
-    Events.on(EVENTS.TX_DELETED, function() { renderAll(); renderOverview(); });
+    Events.on(EVENTS.TX_CREATED, function() { renderAll(); renderOverview(); _updateTopbarWallet(); if (typeof renderWallet === 'function') renderWallet(); });
+    Events.on(EVENTS.TX_UPDATED, function() { renderAll(); renderOverview(); _updateTopbarWallet(); if (typeof renderWallet === 'function') renderWallet(); });
+    Events.on(EVENTS.TX_DELETED, function() { renderAll(); renderOverview(); _updateTopbarWallet(); if (typeof renderWallet === 'function') renderWallet(); });
 
-    Events.on(EVENTS.FUND_CREATED, function() { renderOverview(); });
-    Events.on(EVENTS.FUND_UPDATED, function() { renderOverview(); });
-    Events.on(EVENTS.FUND_DELETED, function() { renderOverview(); });
+    Events.on(EVENTS.FUND_CREATED, function() { renderOverview(); _updateTopbarWallet(); });
+    Events.on(EVENTS.FUND_UPDATED, function() { renderOverview(); _updateTopbarWallet(); });
+    Events.on(EVENTS.FUND_DELETED, function() { renderOverview(); _updateTopbarWallet(); });
+
+    // 钱包变更 → 刷新总钱包页
+    Events.on(EVENTS.FUND_CREATED, function() { if (typeof renderWallet === 'function') renderWallet(); });
+    Events.on(EVENTS.FUND_UPDATED, function() { if (typeof renderWallet === 'function') renderWallet(); });
+    Events.on(EVENTS.FUND_DELETED, function() { if (typeof renderWallet === 'function') renderWallet(); });
+    Events.on(EVENTS.WALLET_CREATED, function() { if (typeof renderWallet === 'function') renderWallet(); _updateTopbarWallet(); });
+    Events.on(EVENTS.WALLET_UPDATED, function() { if (typeof renderWallet === 'function') renderWallet(); _updateTopbarWallet(); });
+    Events.on(EVENTS.WALLET_DELETED, function() { if (typeof renderWallet === 'function') renderWallet(); _updateTopbarWallet(); });
+    Events.on(EVENTS.TXS_LOADED, function() { if (typeof renderWallet === 'function') renderWallet(); });
+  }
+
+  function _updateTopbarWallet() {
+    try {
+      var badge = document.getElementById('total-wallet-badge');
+      if (!badge) return;
+      var total = getTotalWallet();
+      badge.textContent = '💰 總錢包: ' + fmtMoney(total);
+    } catch (e) {
+      console.error('[v13:app] _updateTopbarWallet error:', e);
+    }
   }
 
   // ========================================================================
