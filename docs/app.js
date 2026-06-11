@@ -7205,7 +7205,10 @@ var RM = {
     // 先从三联动 select 合成日期并写入 hidden input
     var checkIn  = rmReadDateSels('rm-checkin');
     var checkOut = rmReadDateSels('rm-checkout');
-    var nights = calcNights(checkIn, checkOut);
+    // 归一化日期分隔符: YYYY/MM/DD → YYYY-MM-DD，确保跨浏览器 Date 解析正确
+    var ci = checkIn.replace(/\//g, '-');
+    var co = checkOut.replace(/\//g, '-');
+    var nights = calcNights(ci, co);
     if ($('#rm-nights')) $('#rm-nights').value = nights;
     RM.calcTotal();
   },
