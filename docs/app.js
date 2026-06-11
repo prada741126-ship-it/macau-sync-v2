@@ -8038,13 +8038,13 @@ function _renderFundCard() {
     return (b.date || '').replace(/\//g, '-').localeCompare((a.date || '').replace(/\//g, '-'));
   });
 
-  // 渲染卡片
-  var html = '<div class="wallet-fund-card">' +
-    '<div class="wallet-fund-card-header">' +
-      '<span class="wf-name">🏦 公基金</span>' +
-      '<span class="wf-balance">' + fmtMoney(balance) + '</span>' +
+  // 渲染卡片 — 复用代理钱包卡片样式 (.wallet-agent-card 系列)，视觉统一
+  var html = '<div class="wallet-agent-card">' +
+    '<div class="wallet-agent-card-header">' +
+      '<span class="wa-name">🏦 公基金</span>' +
+      '<span class="wa-balance">' + fmtMoney(balance) + '</span>' +
     '</div>' +
-    '<div class="wallet-fund-card-body">' +
+    '<div class="wallet-agent-card-body">' +
       '<table>' +
         '<thead><tr><th>佣金公基金</th><th>存入</th><th>自存現金</th><th>提領</th></tr></thead>' +
         '<tbody><tr>' +
@@ -8056,10 +8056,10 @@ function _renderFundCard() {
       '</table>' +
     '</div>';
 
-  // 明细
+  // 明细 — 复用代理钱包卡片明细风格
   if (details.length > 0) {
-    html += '<div class="wallet-fund-card-detail">' +
-      '<table>' +
+    html += '<div style="padding:0 10px 8px">' +
+      '<table style="font-size:11px">' +
       '<thead><tr><th style="width:90px">日期</th><th>類型</th><th style="text-align:right">金額</th><th>備註</th></tr></thead>' +
       '<tbody>';
 
@@ -8069,10 +8069,10 @@ function _renderFundCard() {
       var tc = isOut ? 'var(--danger)' : 'var(--success)';
       var prefix = isOut ? '-' : '+';
       html += '<tr>' +
-        '<td>' + dt.date + '</td>' +
-        '<td style="color:' + tc + '">' + dt.type + '</td>' +
-        '<td style="text-align:right;color:' + tc + '">' + prefix + fmtMoney(dt.amount) + '</td>' +
-        '<td>' + dt.note + '</td>' +
+        '<td style="font-size:11px">' + dt.date + '</td>' +
+        '<td style="font-size:11px;color:' + tc + '">' + dt.type + '</td>' +
+        '<td style="font-size:11px;text-align:right;color:' + tc + '">' + prefix + fmtMoney(dt.amount) + '</td>' +
+        '<td style="font-size:11px">' + dt.note + '</td>' +
         '</tr>';
     }
 
