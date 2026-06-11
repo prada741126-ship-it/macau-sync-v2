@@ -1638,7 +1638,27 @@ var Store = (function() {
     save(STORAGE_KEYS.RM_BOOKINGS, bookings, false);
   }
   function loadBookings() {
-    return load(STORAGE_KEYS.RM_BOOKINGS, false) || [];
+    var bookings = load(STORAGE_KEYS.RM_BOOKINGS, false) || [];
+    // 数据迁移：修正旧数据中 month 字段格式 (YYYY/MM → YYYY-MM)
+    var fixed = 0;
+    for (var i = 0; i < bookings.length; i++) {
+      if (bookings[i].month && bookings[i].month.indexOf('/') >= 0) {
+        bookings[i].month = bookings[i].month.replace(/\//g, '-');
+        fixed++;
+      }
+      if (bookings[i].checkIn && bookings[i].checkIn.indexOf('/') >= 0) {
+        bookings[i].checkIn = bookings[i].checkIn.replace(/\//g, '-');
+      }
+      if (bookings[i].checkOut && bookings[i].checkOut.indexOf('/') >= 0) {
+        bookings[i].checkOut = bookings[i].checkOut.replace(/\//g, '-');
+      }
+    }
+    if (fixed > 0) {
+      console.log('[v13:store] Migrated ' + fixed + ' bookings: month format YYYY/MM → YYYY-MM');
+      // 保存修正后的数据
+      save(STORAGE_KEYS.RM_BOOKINGS, bookings, false);
+    }
+    return bookings;
   }
   function saveBookingLastId(id) {
     localStorage.setItem(STORAGE_KEYS.RM_LAST_ID, String(id));
@@ -7379,6 +7399,9 @@ var RM = {
     var quota = calcRoomQuota(RM.bookings, State.get('txs'), month);
     var el = $('.rm-quota-bar');
     if (el) el.style.width = quota.usageRate.toFixed(1) + '%';
+
+    var rateEl = $('.rm-quota-rate');
+    if (rateEl) rateEl.textContent = quota.usageRate.toFixed(1) + '%';
 
     var volEl = $('.rm-quota-volume');
     if (volEl) volEl.textContent = fmt(quota.totalVolume) + '萬';
